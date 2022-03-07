@@ -1,41 +1,50 @@
 //SPDX-License-Identifier: Unlicense
-pragma solidity ^0.8.11;
+pragma solidity ^0.8.4;
 
 contract Gravity {
-    uint utcStartTime;
+    uint utcStartTime; // Deepak: do we need this???
+
     uint strategyCount;
     uint daiDailyPurchase;
     bool tradeExecuted;
 
+    enum IntervalFrquency {Daily,Weekly,Monthly,Quaterly,HalfYearly,Yearly} // Deepak: More descriptive intervals
+    sourceAsset, targetAsset enum
+
+
     constructor(uint _utcStartTime) {
-        utcStartTime = _utcStartTime;
+        //utcStartTime = _utcStartTime; // contract deployment timestamp
     }
 
-    struct LiveStrategy {
-        uint initStrategy;       // timestamp
-        uint purchaseInterval;   // number of days
-        uint purchaseAmount;     // e.g., 10% of daiBalance
-        uint trigger;            // timestamp trigger
-        uint purchasesRemaining; // count of purchases, calc at strat init
-    }
+    // struct LiveStrategy {
+    //     uint             initStrategy;       // timestamp
+    //     IntervalFrquency purchaseInterval;   // number of interval days, minimum will be 1 day and max yearly
+    //     uint             purchaseAmount;     // e.g., 10% of daiBalance
+    //     uint             trigger;            // timestamp trigger
+    //     uint             purchasesRemaining; // count of purchases, calc at strat init
+    // } 
 
-    // user account details
+    // data structure for each account policy
     struct Account {
-        uint sourceBalance;
-        uint targetBalance;
-        uint strategyFrequency;         // timestamp offset
-        LiveStrategy liveStrategy;
+        uint             AccountId;
+        uint             AccountStart;
+        AssetType        sourceAsset;
+        AssetType           targetAsset;
+        uint             sourceBalance;
+        uint             targetBalance;
+        uint             intervalAmount;
+        IntervalFrquency strategyFrequency;   // number of interval days, minimum will be 1 day and max yearly;         // timestamp offset
     }
 
-    // purchase order details for user a specific interval
+    // purchase order details for a user & account policy at a specific interval
     struct PurchaseOrder {
         address user;
-        uint purchaseAmount;
-        uint interval;
+        uint    AccountId;
+        uint    purchaseAmount;
     }
 
-    // user address to user Account mapping
-    mapping (address => Account) public accounts;
+    // user address to user Account policy mapping
+    mapping (address => Account[]) public accounts;
 
     // timestamp interval to PurchaseOrder mapping
     mapping (uint => PurchaseOrder[]) public liveStrategies;
@@ -54,6 +63,9 @@ contract Gravity {
     }
 
     // function initiateNewStrategy() {
+        Validate inputs for accounts
+        Populate account
+        Populate Strategy
 
     // }
 

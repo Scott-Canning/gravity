@@ -3,7 +3,7 @@ require("@nomiclabs/hardhat-etherscan");
 require('dotenv').config({path:__dirname+'/.env'})
 
 module.exports = {
-  solidity: "0.7.0",
+  solidity: "0.8.4",
   paths: {
     artifacts: "./app/artifacts",
   },
