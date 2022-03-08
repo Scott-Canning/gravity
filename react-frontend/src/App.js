@@ -1,7 +1,7 @@
 import { ethers } from 'ethers';
 import './App.css';
 import React from 'react';
-import gravityJSON from './utils/gravitySCtest.json';
+import gravityJSON from './utils/gravity.json';
 import linkJSON from './utils/link.json';
 
 const gravityAddress = '0xF9E95c9b65D79565755B2d7c006913E1404bec8d';

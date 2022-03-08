@@ -11,7 +11,7 @@ interface IERC20 {
     event Approval(address indexed owner, address indexed spender, uint256 value);
 }
 
-contract GravitySCtest {
+contract Gravity {
     uint strategyCount;
     uint tradeAmount;
     bool tradeExecuted;
