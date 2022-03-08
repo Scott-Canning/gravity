@@ -11,7 +11,7 @@ async function deploy() {
   let privateKey = process.env.KOVAN_KEY;
   let wallet = new ethers.Wallet(privateKey, provider);
 
-  let artifacts = await hre.artifacts.readArtifact("GravitySCtest");
+  let artifacts = await hre.artifacts.readArtifact("Gravity");
   let factory = new ethers.ContractFactory(artifacts.abi, artifacts.bytecode, wallet);
   let contract = await factory.deploy();
 
