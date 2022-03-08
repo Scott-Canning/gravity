@@ -11,11 +11,11 @@ async function deploy() {
   let privateKey = process.env.KOVAN_KEY;
   let wallet = new ethers.Wallet(privateKey, provider);
 
-  let artifacts = await hre.artifacts.readArtifact("Gravity");
+  let artifacts = await hre.artifacts.readArtifact("GravitySCtest");
   let factory = new ethers.ContractFactory(artifacts.abi, artifacts.bytecode, wallet);
   let contract = await factory.deploy();
 
-  console.log("Swap address:", contract.address);
+  console.log("Contract address:", contract.address);
   await contract.deployed();
 }
 

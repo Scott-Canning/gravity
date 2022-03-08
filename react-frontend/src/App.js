@@ -45,14 +45,14 @@ function App() {
     console.log("approve: ", approve);
 
     const contractInstance = new ethers.Contract(gravityAddress, gravityJSON.abi, signer);
-    const deposit = await contractInstance.deposit(depositAsset, depositAmount, {gasLimit: 125000});
+    const deposit = await contractInstance.deposit(depositAsset, depositAmount, {gasLimit: 350000});
     console.log("deposit: ", deposit);
   }
 
   async function withdraw() {
     const signer = await provider.getSigner();
     const contractInstance = new ethers.Contract(gravityAddress, gravityJSON.abi, signer);
-    const withdraw = await contractInstance.withdraw(withdrawAsset, withdrawAmount, {gasLimit: 125000});
+    const withdraw = await contractInstance.withdraw(withdrawAsset, withdrawAmount, {gasLimit: 350000});
     console.log("deposit: ", withdraw);
   }
 
