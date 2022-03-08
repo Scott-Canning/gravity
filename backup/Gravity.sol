@@ -1,35 +1,52 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.4;
 
-contract Gravity {
-    uint utcStartTime; // Deepak: do we need this???
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@chainlink/contracts/src/v0.7/KeeperCompatible.sol";
 
+interface IERC20 {
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address to, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transferFrom( address from, address to, uint256 amount) external returns (bool);
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+}
+
+contract Gravity is ERC20, KeeperCompatibleInterface {
     uint strategyCount;
-    uint daiDailyPurchase;
+    uint tradeAmount;
     bool tradeExecuted;
 
-    enum IntervalFrquency {Daily,Weekly,Monthly,Quaterly,HalfYearly,Yearly} // Deepak: More descriptive intervals
-    sourceAsset, targetAsset enum
+    enum IntervalFrquency { Daily, Weekly, Monthly, Quaterly, HalfYearly } // Deepak: More descriptive intervals
+    // sourceAsset, targetAsset enum
+    enum AssetType { DAI, USDC, wETH, wBTC }
 
+    // user address to user Account policy mapping
+    mapping (address => Account[]) public accounts;
+    // timestamp interval to PurchaseOrder mapping
+    mapping (uint => PurchaseOrder[]) public liveStrategies;
+    // ERC20 token address mapping
+    mapping (AssetType => address) public tokenAddresses;
 
-    constructor(uint _utcStartTime) {
-        //utcStartTime = _utcStartTime; // contract deployment timestamp
+    constructor() {
+        // load asset addresses into tokenAddress mapping
+        tokenAddresses[AssetType.DAI] = '0xC4375B7De8af5a38a93548eb8453a498222C4fF2';
+        tokenAddresses[AssetType.wETH] = '0xd0A1E359811322d97991E03f863a0C30C2cF029C';
+        // tokenAddresses[AssetType.USDC] = ;
+        // tokenAddresses[AssetType.wBTC] = ;
     }
 
-    // struct LiveStrategy {
-    //     uint             initStrategy;       // timestamp
-    //     IntervalFrquency purchaseInterval;   // number of interval days, minimum will be 1 day and max yearly
-    //     uint             purchaseAmount;     // e.g., 10% of daiBalance
-    //     uint             trigger;            // timestamp trigger
-    //     uint             purchasesRemaining; // count of purchases, calc at strat init
-    // } 
+    event Deposited(address, uint256);
+    event Withdrawn(address, uint256);
 
     // data structure for each account policy
     struct Account {
-        uint             AccountId;
-        uint             AccountStart;
+        uint             accountId;
+        uint             accountStart;
         AssetType        sourceAsset;
-        AssetType           targetAsset;
+        AssetType        targetAsset;
         uint             sourceBalance;
         uint             targetBalance;
         uint             intervalAmount;
@@ -39,39 +56,62 @@ contract Gravity {
     // purchase order details for a user & account policy at a specific interval
     struct PurchaseOrder {
         address user;
-        uint    AccountId;
+        uint    accountId;
         uint    purchaseAmount;
     }
 
-    // user address to user Account policy mapping
-    mapping (address => Account[]) public accounts;
-
-    // timestamp interval to PurchaseOrder mapping
-    mapping (uint => PurchaseOrder[]) public liveStrategies;
-
     // function to remove prior days array value from liveStrategies
-    function deleteKV(uint timestamp) internal {
+    function deleteKV(uint _timestamp) internal {
         delete liveStrategies[timestamp];
     }
 
     // constant time function to remove users with 0 daiBalance, decrement dailyPoolUserCount
-    function removeStrategy(uint index) internal {
+    function removePurchaseOrder(uint _index) internal {
         require(index < liveStrategies.length, "Index out of range");
-        liveStrategies[index] = liveStrategies[liveStrategies.length - 1];
+        liveStrategies[_index] = liveStrategies[liveStrategies.length - 1];
         liveStrategies.pop();
-        strategyCount--;
     }
 
     // function initiateNewStrategy() {
-        Validate inputs for accounts
-        Populate account
-        Populate Strategy
-
+        // Validate inputs for accounts
+        // Populate account
+        // Populate Strategy
     // }
 
-    // function withdrawSource() {
+    // deposit first requires approving an allowance by the msg.sender
+    // e.g.: const approve = await erc20token.approve(Gravity.address, _amount);
 
-    // }
+    function deposit(AssetType _sourceAsset, uint256 _amount) external {
+        require(_amount > 0, "Insufficient value");
+        address _token = tokenAddresses[_sourceAsset];
+        require(_token == 0, "Unsupported asset type");
+        balances[msg.sender] += _amount;
+        (bool success) = IERC20(_token).transferFrom(msg.sender, address(this), _amount);
+        require(success, "Deposit unsuccessful: transferFrom");
+        emit Deposited(msg.sender, _amount);
+    }
+
+    // contract needs to inherit ERC20
+    function withdrawSource(uint _accountId, AssetType _sourceAsset, uint _amount) external payable {
+        // find user account that matches provide _accountId
+        // (front-end can handle querying account <-> accountId <-> AssetType)
+        uint _id;
+        for(uint i = 0; i < accounts[msg.sender]; i++) {
+            if(accounts[msg.sender][i] == _accountId) {
+                id = _accoundId
+            }
+        }
+        // require AssetType withdraw to equal 
+        require(_sourceAsset == accounts[msg.sender][_id].sourceAsset);
+        if(accounts[msg.sender].sourceBalance >= _amount) {
+            address _token = tokenAddresses[_sourceAsset];
+            (bool success) = IERC20(_token).transfer(msg.sender, _amount);
+            require(success, "Withdraw unsuccessful");
+            emit Withdrawn(msg.sender, _amount);
+
+        } else if ()
+        
+    }
 
     // function withdrawTarget() {
 
