@@ -4,9 +4,8 @@ import React from 'react';
 import gravityJSON from './utils/gravity.json';
 import daiJSON from './utils/dai.json';
 
-const gravityAddress = '0xfBAdDD36e5E1c43958dBaC6e56fC5D84F5185137';
-
-const DAI_KOVAN = '0xC4375B7De8af5a38a93548eb8453a498222C4fF2';
+const gravityAddress = '0x58C642eef79Be47BcEcB081853eA3Eabf9EcF270';
+const DAI_KOVAN = '0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa';
 const WETH_KOVAN = '0xd0A1E359811322d97991E03f863a0C30C2cF029C';
 //const LINK_KOVAN = '0xa36085F69e2889c224210F603D836748e7dC0088';
 

@@ -34,14 +34,14 @@ contract Gravity {
 
     constructor(address _sourceToken, address _targetToken) {
         owner = payable(msg.sender);
-        // for hardhat local testing
+        // for testing
         sourceTokens[address(_sourceToken)] = true; // TestToken (testing only)
         targetTokens[address(_targetToken)] = true;
 
         // load asset Kovan addresses into tokenAddress mapping
-        sourceTokens[address(0xC4375B7De8af5a38a93548eb8453a498222C4fF2)] = true; // DAI
-        sourceTokens[address(0xd0A1E359811322d97991E03f863a0C30C2cF029C)] = true; // WETH
-        sourceTokens[address(0xa36085F69e2889c224210F603D836748e7dC0088)] = true; // LINK
+        // sourceTokens[address(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa)] = true; // DAI
+        // sourceTokens[address(0xd0A1E359811322d97991E03f863a0C30C2cF029C)] = true; // WETH
+        // sourceTokens[address(0xa36085F69e2889c224210F603D836748e7dC0088)] = true; // LINK
     }
 
     // create new strategy
