@@ -3,6 +3,8 @@ const { ethers } = require('ethers');
 require('dotenv').config();
 
 // boilerplate placeholder (requires configuration)
+//const sourceToken = ''
+//const targetToken = ''
 
 async function deploy() {
   const url = process.env.KOVAN_URL;
@@ -13,7 +15,7 @@ async function deploy() {
 
   let artifacts = await hre.artifacts.readArtifact("Gravity");
   let factory = new ethers.ContractFactory(artifacts.abi, artifacts.bytecode, wallet);
-  let contract = await factory.deploy();
+  let contract = await factory.deploy(/* sourceToken, targetToken */);
 
   console.log("Contract address:", contract.address);
   await contract.deployed();
