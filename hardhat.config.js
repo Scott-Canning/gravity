@@ -7,14 +7,14 @@ module.exports = {
   paths: {
     artifacts: "./app/artifacts",
   },
-  defaultNetwork: "kovan", 
+  defaultNetwork: "hardhat", 
   networks: {
     hardhat: {
     },
     kovan: {
       url: process.env.KOVAN_URL,
-      accounts: [process.env.KOVAN_KEY],
-    },
+      accounts: [process.env.PRIVATE_KEY],
+    }
   },
   etherscan: {
     apiKey: {
