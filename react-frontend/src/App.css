@@ -42,7 +42,32 @@
   margin: 1rem;
 }
 
+.user-balances {
+  text-align: left;
+  font-size: 16px;
+  font-family: futura;
+  margin: 1rem;
+}
+
+.user-strategies {
+  text-align: left;
+  font-size: 16px;
+  font-family: futura;
+  margin: 1rem;
+}
+
+.container {
+  border-width: 1px;
+  border-color: #282c34;
+  float: left;
+  text-align: left;
+  font-size: 16px;
+  font-family: futura;
+  margin: 1rem;
+}
+
 .deposit {
+  float: left;
   text-align: left;
   font-size: 16px;
   font-family: futura;
@@ -62,6 +87,7 @@
 }
 
 .withdraw {
+  float: right;
   text-align: left;
   font-size: 16px;
   font-family: futura;
