@@ -23,7 +23,7 @@ contract Gravity {
         uint            deployedBalance;
         uint            targetBalance;
         uint            interval;           // 1, 7, 14, 21, 30
-        uint            purchaseAmount;     // % of sourceBalance
+        uint            purchaseAmount;     // purchase amount per interval of sourceBalance
         uint            purchasesRemaining;
     }
 
@@ -44,6 +44,17 @@ contract Gravity {
         // sourceTokens[address(0xa36085F69e2889c224210F603D836748e7dC0088)] = true; // LINK
     }
 
+    // [production] accumulatePurchaseOrders
+    // function accumulatePurchaseOrders() internal view returns (uint) {
+    //     uint _now = block.timestamp;
+    //     uint _unixNoonToday = _now - (_now % 86400) + 43200;
+    //     uint _total;
+    //     for(uint i = 0; i < purchaseOrders[_unixNoonToday].length; i++) {
+    //         _total += purchaseOrders[_unixNoonToday][i].purchaseAmount;
+    //     }
+    //     return _total;
+    // }
+
     // create new strategy
     function initiateNewStrategy(address _sourceAsset, address _targetAsset, uint _sourceBalance, uint _interval, uint _purchaseAmount) public {
         require(sourceTokens[_sourceAsset] == true, "Unsupported source asset type");
@@ -51,7 +62,6 @@ contract Gravity {
         require(_sourceBalance > 0, "Insufficient deposit amount");
         require(_interval == 1 || _interval == 7 || _interval == 14 || _interval == 21 || _interval == 30, "Unsupported interval");
         uint _accountStart = block.timestamp;
-        uint _purchasePerInterval = _purchaseAmount * _sourceBalance;
         uint _purchasesRemaining = _sourceBalance / _purchasePerInterval;
         accounts[msg.sender] = Account(_accountStart, 
                                        _sourceAsset, 
@@ -60,7 +70,7 @@ contract Gravity {
                                        0, 
                                        0, 
                                        _interval, 
-                                       _purchasePerInterval, 
+                                       _purchaseAmount, 
                                        _purchasesRemaining);
 
         // populate purchaseOrders mapping
