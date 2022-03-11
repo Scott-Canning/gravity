@@ -3,20 +3,30 @@ import './App.css';
 import React from 'react';
 import gravityJSON from './utils/gravity.json';
 import daiJSON from './utils/dai.json';
+import linkJSON from './utils/link.json';
 
-const gravityAddress = '0x58C642eef79Be47BcEcB081853eA3Eabf9EcF270';
+const gravityAddress = '0x5C1Ede612Cbd50cE32dDB899b615823D1F75D0c0';
 const DAI_KOVAN = '0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa';
 const WETH_KOVAN = '0xd0A1E359811322d97991E03f863a0C30C2cF029C';
-//const LINK_KOVAN = '0xa36085F69e2889c224210F603D836748e7dC0088';
+const LINK_KOVAN = '0xa36085F69e2889c224210F603D836748e7dC0088';
 
 function App() {
   const [address, setAddress] = React.useState("");
   const [balance, setBalance] = React.useState("");
+  
+  // State variables for user erc20 balances.
+  const [daiBalance, setDaiBalance] = React.useState("");
+  const [linkBalance, setLinkBalance] = React.useState("");
+  //const [wethBalance, setWethBalance] = React.useState("");
+  
   const [depositAsset, setDepositAsset] = React.useState("");
   const [depositAmount, setDepositAmount] = React.useState("");
   const [purchaseAmount, setPurchaseAmount] = React.useState("");
   const [withdrawAsset, setWithdrawAsset] = React.useState("");
   const [withdrawAmount, setWithdrawAmount] = React.useState("");
+
+  // State variables for user orders and order details.
+  const [ordersCount, setOrdersCount] = React.useState("");
 
   const { ethereum } = window;
   let provider;
@@ -24,9 +34,11 @@ function App() {
   const tokenAddresses = {};
   tokenAddresses['DAI'] = DAI_KOVAN;
   tokenAddresses['ETH'] = WETH_KOVAN;
+  tokenAddresses['LINK'] = LINK_KOVAN;
 
   const contractJSONs = {};
   contractJSONs['DAI'] = daiJSON;
+  contractJSONs['LINK'] = linkJSON;
   
   if(ethereum) {
     ethereum.request({ method: 'eth_requestAccounts' });
@@ -40,8 +52,34 @@ function App() {
     const signer = await provider.getSigner();
     const userAddress = await signer.getAddress();
     const userBalance = await provider.getBalance(userAddress);
+    //console.log("User Balance: ", userBalance);
     setAddress(userAddress);
     setBalance(ethers.utils.formatEther(userBalance));
+
+    //
+    const daiContract = new ethers.Contract(DAI_KOVAN, daiJSON, signer);
+    const userDaiBalance = await daiContract.balanceOf(userAddress);
+    //console.log("DAI BALANCE: ", userDaiBalance);
+    setDaiBalance(ethers.utils.formatEther(userDaiBalance));
+    //
+    const linkContract = new ethers.Contract(LINK_KOVAN, linkJSON, signer);
+    const userLinkBalance = await linkContract.balanceOf(userAddress);
+    //console.log("LINK BALANCE: ", userLinkBalance);
+    setLinkBalance(ethers.utils.formatEther(userLinkBalance));
+
+
+    // Display puchase orders
+
+    const contractInstance = new ethers.Contract(gravityAddress, gravityJSON, signer);
+    const purchaseOrders = await contractInstance.purchaseOrders;
+    const poCount = purchaseOrders.length;
+    //console.log("PURCHASE ORDERS: ", purchaseOrders);
+    console.log(poCount);
+    setOrdersCount(poCount);
+    //
+    // for(let i=0; i<poCount; i++) {
+    //  console.log(purchaseOrders[i]);
+    // }
   }
 
   async function initiateNewStrategy() {
@@ -77,32 +115,82 @@ function App() {
         Gravity [Kovan]
       </div>
       <div className="user-info">
-        <p>
-          <b>Contract address:</b> {gravityAddress}
-        </p>
-        <p>
-          <b>Your address:</b> {address}
-        </p>
-        <p>
-          <b>Your balance:</b> {balance}
-        </p>
+        <b>Contract Details</b>
+        <ul>
+          <li>
+            Contract address: {gravityAddress}
+          </li>
+          <li>
+            Your address: {address}
+          </li>
+        </ul>
       </div>
-      <p>
-        <label> Deposit Asset: </label>
-        <input className="deposit-input" value={depositAsset} onInput={e => setDepositAsset(e.target.value)}/>
-        <label> Deposit Amount: </label>
-        <input className="deposit-input" value={depositAmount} onInput={e => setDepositAmount(e.target.value)}/>
-        <label> Purchase Amount: </label>
-        <input className="deposit-input" value={purchaseAmount} onInput={e => setPurchaseAmount(e.target.value)}/>
-        <button className="deposit-button" onClick={initiateNewStrategy}> initiateNewStrategy </button>
-      </p>
-      <p>
-        <label> Withdraw Asset: </label>
-        <input className="withdraw-input" value={withdrawAsset} onInput={e => setWithdrawAsset(e.target.value)}/>
-        <label> Withdraw Amount: </label>
-        <input className="withdraw-input" value={withdrawAmount} onInput={e => setWithdrawAmount(e.target.value)}/>
-        <button className="withdraw-button" onClick={withdraw}> Withdraw </button>
-      </p>
+      <div className="user-balances">
+        <b>Your Balances</b>
+        <ul>
+          <li>
+            ETH: {balance}
+          </li>
+          <li>
+            DAI: {daiBalance}
+          </li>
+          <li>
+            LINK: {linkBalance}
+          </li>
+          <li>
+            WETH: {/* {wethBalance} */}
+          </li>
+        </ul>
+      </div>
+      <div className="container">
+        <div>
+          <b>New Strategy</b>
+        </div>
+        <div className="deposit">
+          <b>Deposit</b>
+          <div>
+            <label> Deposit Asset: </label>
+            <input className="deposit-input" value={depositAsset} onInput={e => setDepositAsset(e.target.value)}/>
+          </div>
+          <div>
+            <label> Deposit Amount: </label>
+            <input className="deposit-input" value={depositAmount} onInput={e => setDepositAmount(e.target.value)}/>
+          </div>
+          <div>
+            <label> Purchase Amount: </label>
+            <input className="deposit-input" value={purchaseAmount} onInput={e => setPurchaseAmount(e.target.value)}/>
+          </div>
+          <div>
+            <button className="deposit-button" onClick={initiateNewStrategy}> initiateNewStrategy </button>
+          </div>
+        </div>
+        
+        <div className="withdraw">
+          <b>Withdraw</b>
+          <div>
+            <label> Withdraw Asset: </label>
+            <input className="withdraw-input" value={withdrawAsset} onInput={e => setWithdrawAsset(e.target.value)}/>
+          </div>
+          <div>     
+            <label> Withdraw Amount: </label>
+            <input className="withdraw-input" value={withdrawAmount} onInput={e => setWithdrawAmount(e.target.value)}/>
+          </div>
+          <div>  
+            <button className="withdraw-button" onClick={withdraw}> Withdraw </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="container">
+        <div className="user-strategies">
+          <b>My Strategies</b>
+          <ul>
+            <li>
+              Open Orders: {ordersCount}
+            </li>
+          </ul>
+        </div>
+      </div>
     </div>
   );
 }
