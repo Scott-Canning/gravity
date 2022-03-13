@@ -80,6 +80,11 @@ function App() {
     // for(let i=0; i<poCount; i++) {
     //  console.log(purchaseOrders[i]);
     // }
+
+    // Accounts
+    const accountsList = await contractInstance.accounts;
+    console.log(accountsList);
+    console.log(accountsList.length);
   }
 
   async function initiateNewStrategy() {
@@ -115,7 +120,7 @@ function App() {
         Gravity [Kovan]
       </div>
       <div className="user-info">
-        <b>Contract Details</b>
+        <h3>Contract Details</h3>
         <ul>
           <li>
             Contract address: {gravityAddress}
@@ -126,7 +131,7 @@ function App() {
         </ul>
       </div>
       <div className="user-balances">
-        <b>Your Balances</b>
+        <h3>Your Balances</h3>
         <ul>
           <li>
             ETH: {balance}
@@ -143,47 +148,45 @@ function App() {
         </ul>
       </div>
       <div className="container">
-        <div>
-          <b>New Strategy</b>
-        </div>
+        <h3>Manage Strategies</h3>
         <div className="deposit">
-          <b>Deposit</b>
-          <div>
+          <b>Open New (Deposit)</b>
+          <div className="input-row">
             <label> Deposit Asset: </label>
-            <input className="deposit-input" value={depositAsset} onInput={e => setDepositAsset(e.target.value)}/>
+            <input  value={depositAsset} onInput={e => setDepositAsset(e.target.value)}/>
           </div>
-          <div>
+          <div className="input-row">
             <label> Deposit Amount: </label>
-            <input className="deposit-input" value={depositAmount} onInput={e => setDepositAmount(e.target.value)}/>
+            <input  value={depositAmount} onInput={e => setDepositAmount(e.target.value)}/>
           </div>
-          <div>
+          <div className="input-row">
             <label> Purchase Amount: </label>
-            <input className="deposit-input" value={purchaseAmount} onInput={e => setPurchaseAmount(e.target.value)}/>
+            <input  value={purchaseAmount} onInput={e => setPurchaseAmount(e.target.value)}/>
           </div>
-          <div>
-            <button className="deposit-button" onClick={initiateNewStrategy}> initiateNewStrategy </button>
+          <div className="deposit-button">
+            <button onClick={initiateNewStrategy}> initiateNewStrategy </button>
           </div>
         </div>
         
         <div className="withdraw">
-          <b>Withdraw</b>
-          <div>
+          <b>Close Strategy (Withdraw)</b>
+          <div className="input-row">
             <label> Withdraw Asset: </label>
-            <input className="withdraw-input" value={withdrawAsset} onInput={e => setWithdrawAsset(e.target.value)}/>
+            <input value={withdrawAsset} onInput={e => setWithdrawAsset(e.target.value)}/>
           </div>
-          <div>     
+          <div className="input-row">     
             <label> Withdraw Amount: </label>
-            <input className="withdraw-input" value={withdrawAmount} onInput={e => setWithdrawAmount(e.target.value)}/>
+            <input value={withdrawAmount} onInput={e => setWithdrawAmount(e.target.value)}/>
           </div>
-          <div>  
-            <button className="withdraw-button" onClick={withdraw}> Withdraw </button>
+          <div className="withdraw-button">  
+            <button  onClick={withdraw}> Withdraw </button>
           </div>
         </div>
       </div>
 
       <div className="container">
         <div className="user-strategies">
-          <b>My Strategies</b>
+          <h3>My Strategies</h3>
           <ul>
             <li>
               Open Orders: {ordersCount}
