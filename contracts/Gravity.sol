@@ -6,7 +6,7 @@ import "@chainlink/contracts/src/v0.8/KeeperCompatible.sol";
 
 contract Gravity is KeeperCompatibleInterface {
     address payable owner;
-    bool public onOff = true; // [testing] toggle Keeper on/off
+    bool public onOff = true;                                   // [testing] toggle Keeper on/off
     uint public immutable upKeepInterval;
     uint public lastTimeStamp;
     uint public priorSlot;
@@ -18,8 +18,8 @@ contract Gravity is KeeperCompatibleInterface {
     mapping (uint => PurchaseOrder[]) public purchaseOrders;
 
     event NewStrategy(address);
-    event PurchaseExecuted(uint256);    // testing
-    event PerformUpkeepFailed(uint256); // testing
+    event PurchaseExecuted(uint256);                            // testing
+    event PerformUpkeepFailed(uint256);                         // testing
     event Deposited(address, uint256);
     event Withdrawn(address, uint256);
 
@@ -30,8 +30,8 @@ contract Gravity is KeeperCompatibleInterface {
         uint            sourceBalance;
         uint            scheduledBalance;
         uint            targetBalance;
-        uint            interval;               // 1, 7, 14, 21, 30
-        uint            purchaseAmount;         // purchase amount per interval of sourceBalance
+        uint            interval;                               // 1, 7, 14, 21, 30
+        uint            purchaseAmount;                         // purchase amount per interval of sourceBalance
         uint            purchasesRemaining;
         bool            withdrawFlag;
     }
@@ -61,25 +61,7 @@ contract Gravity is KeeperCompatibleInterface {
         // sourceTokens[address(0xa36085F69e2889c224210F603D836748e7dC0088)] = true; // LINK
     }
 
-    /*
-    * - - - - - - - - - - - - keeper integration [start] - - - - - - - - - - - - 
-    */
 
-    // [production] checkUpkeep
-    // function checkUpkeep(bytes calldata /* checkData */) external override returns (bool upkeepNeeded, bytes memory /* performData */) {
-    //     require(onOff == true, "Keeper checkUpkeep is off");
-    //     uint _now = block.timestamp;
-    //     uint _unixNoonToday = _now - (_now % 86400) + 43200;
-    //     // if timestamp > noon
-    //     if(block.timestamp > _unixNoonToday) {
-    //         // if total PO > 0
-    //         uint _total = accumulatePurchaseOrders();
-    //         if(_total > 0) {
-    //             upkeepNeeded = true;
-    //         }
-    //     }
-    //     upkeepNeeded = false;
-    // }
 
     // [test_timestamp] accumulatePurchaseOrders
     function accumulatePurchaseOrders(uint _timestamp) public view returns (uint) {
@@ -89,76 +71,6 @@ contract Gravity is KeeperCompatibleInterface {
         }
         return _total;
     }
-
-    // [test_timestamp] initiateNewStrategy
-    function initiateNewStrategy(address _sourceAsset, address _targetAsset, uint _sourceBalance, uint _interval, uint _purchaseAmount) public {
-        require(sourceTokens[_sourceAsset] == true, "Unsupported source asset type");
-        require(targetTokens[_targetAsset] == true, "Unsupported target asset type");
-        require(_sourceBalance > 0, "Insufficient deposit amount");
-        require(_interval == 1 || _interval == 7 || _interval == 14 || _interval == 21 || _interval == 30, "Unsupported interval");
-        uint _accountStart = block.timestamp;
-        uint _purchasesRemaining = _sourceBalance / _purchaseAmount;
-        accounts[msg.sender] = Account(_accountStart, 
-                                       _sourceAsset, 
-                                       _targetAsset, 
-                                       _sourceBalance, 
-                                       0, 
-                                       0, 
-                                       _interval,
-                                       _purchaseAmount,
-                                       _purchasesRemaining,
-                                       false);
-
-        // populate purchaseOrders mapping
-        uint _unixNextTwoMinSlot = _accountStart - (_accountStart % 120) + 240;
-        uint _unixInterval = _interval * 120;
-        for(uint i = 1; i <= _purchasesRemaining; i++) {
-            uint _nextUnixPurchaseDate = _unixNextTwoMinSlot + (_unixInterval * i);
-            purchaseOrders[_nextUnixPurchaseDate].push(PurchaseOrder(msg.sender, _purchaseAmount));
-        }
-
-        // Call depositSource to move account holders sourcebalance to Gravity contract
-        depositSource(_sourceAsset,_sourceBalance);
-    }
-
-    // [test_timestamp] checkUpkeep
-    function checkUpkeep(bytes calldata /* checkData */) external override returns (bool upkeepNeeded, bytes memory /* performData */) {
-        require(onOff == true, "Keeper checkUpkeep is off");
-        if((block.timestamp - lastTimeStamp) > upKeepInterval) {
-            uint256 _now = block.timestamp;
-            uint256 _nextSlot = _now - (_now % 120) + 240;
-            // condition to prevent replay
-            if(_nextSlot > priorSlot) {
-                uint _total = accumulatePurchaseOrders(_nextSlot);
-                if(_total > 0) {
-
-                    upkeepNeeded = true;
-                }
-            }
-        }
-    }
-
-    // [test_timestamp] performUpkeep
-    function performUpkeep(bytes calldata /* performData */) external override {
-        //revalidate the upkeep in the performUpkeep function
-        require(onOff == true, "Keeper checkUpkeep is off");
-        uint256 _now = block.timestamp;
-        nextSlot = _now - (_now % 120) + 240;
-        uint256 _total = accumulatePurchaseOrders(nextSlot);
-        if (_total > 0) {
-            priorSlot = nextSlot; // replay prevention
-            /*
-            * TO DO: add dex transaction
-            */
-            emit PurchaseExecuted(block.timestamp);
-        } else {
-            emit PerformUpkeepFailed(block.timestamp);
-        }
-    }
-
-    /*
-    *  - - - - - - - - - - - - keeper integration [end] - - - - - - - - - - - - 
-    */
 
     // [production] initiateNewStrategy
     // function initiateNewStrategy(address _sourceAsset, address _targetAsset, uint _sourceBalance, uint _interval, uint _purchaseAmount) public {
@@ -192,6 +104,94 @@ contract Gravity is KeeperCompatibleInterface {
     //     emit NewStrategy(msg.sender);
     // }
 
+    // [test_timestamp] initiateNewStrategy
+    function initiateNewStrategy(address _sourceAsset, address _targetAsset, uint _sourceBalance, uint _interval, uint _purchaseAmount) public {
+        require(sourceTokens[_sourceAsset] == true, "Unsupported source asset type");
+        require(targetTokens[_targetAsset] == true, "Unsupported target asset type");
+        require(_sourceBalance > 0, "Insufficient deposit amount");
+        require(_interval == 1 || _interval == 7 || _interval == 14 || _interval == 21 || _interval == 30, "Unsupported interval");
+        uint _accountStart = block.timestamp;
+        uint _purchasesRemaining = _sourceBalance / _purchaseAmount;
+        accounts[msg.sender] = Account(_accountStart, 
+                                       _sourceAsset, 
+                                       _targetAsset, 
+                                       _sourceBalance, 
+                                       0, 
+                                       0, 
+                                       _interval,
+                                       _purchaseAmount,
+                                       _purchasesRemaining,
+                                       false);
+
+        // populate purchaseOrders mapping
+        uint _unixNextTwoMinSlot = _accountStart - (_accountStart % 120) + 240;
+        uint _unixInterval = _interval * 120;
+        for(uint i = 1; i <= _purchasesRemaining; i++) {
+            uint _nextUnixPurchaseDate = _unixNextTwoMinSlot + (_unixInterval * i);
+            purchaseOrders[_nextUnixPurchaseDate].push(PurchaseOrder(msg.sender, _purchaseAmount));
+        }
+
+        // Call depositSource to move account holders sourcebalance to Gravity contract
+        depositSource(_sourceAsset, _sourceBalance);
+        emit NewStrategy(msg.sender);
+    }
+
+    /*
+    * - - - - - - - - - - - - keeper integration [start] - - - - - - - - - - - - 
+    */
+
+    // [production] checkUpkeep
+    // function checkUpkeep(bytes calldata /* checkData */) external override returns (bool upkeepNeeded, bytes memory /* performData */) {
+    //     require(onOff == true, "Keeper checkUpkeep is off");
+    //     uint _now = block.timestamp;
+    //     uint _unixNoonToday = _now - (_now % 86400) + 43200;
+    //     // if timestamp > noon
+    //     if(block.timestamp > _unixNoonToday) {
+    //         // if total PO > 0
+    //         uint _total = accumulatePurchaseOrders();
+    //         if(_total > 0) {
+    //             upkeepNeeded = true;
+    //         }
+    //     }
+    // }
+
+    // [test_timestamp] checkUpkeep
+    function checkUpkeep(bytes calldata /* checkData */) external override returns (bool upkeepNeeded, bytes memory /* performData */) {
+        require(onOff == true, "Keeper checkUpkeep is off");
+        if((block.timestamp - lastTimeStamp) > upKeepInterval) {
+            uint256 _now = block.timestamp;
+            uint256 _nextSlot = _now - (_now % 120) + 240;
+            // condition to prevent replay
+            if(_nextSlot > priorSlot) {
+                uint _total = accumulatePurchaseOrders(_nextSlot);
+                if(_total > 0) {
+                    upkeepNeeded = true;
+                }
+            }
+        }
+    }
+
+    // [test_timestamp] performUpkeep
+    function performUpkeep(bytes calldata /* performData */) external override {
+        //revalidate the upkeep in the performUpkeep function
+        require(onOff == true, "Keeper checkUpkeep is off");
+        uint256 _now = block.timestamp;
+        nextSlot = _now - (_now % 120) + 240;
+        uint256 _total = accumulatePurchaseOrders(nextSlot);
+        if (_total > 0) {
+            priorSlot = nextSlot; // replay prevention
+            /*
+            * TO DO: add dex transaction
+            */
+            emit PurchaseExecuted(block.timestamp);
+        } else {
+            emit PerformUpkeepFailed(block.timestamp);
+        }
+    }
+
+    /*
+    *  - - - - - - - - - - - - keeper integration [end] - - - - - - - - - - - - 
+    */
 
     // TO DO: DEX swap
 
