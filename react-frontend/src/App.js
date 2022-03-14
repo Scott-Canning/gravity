@@ -4,7 +4,7 @@ import React from 'react';
 import gravityJSON from './utils/gravity.json';
 import daiJSON from './utils/dai.json';
 
-const gravityAddress = '0xbc0118491e7205BC6b8CF27284e8c31469fA0f7E';
+const gravityAddress = '0x719d0Dde9F3983b8B34E4F4D250E3c795ddA0f15';
 const DAI_KOVAN = '0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa';
 const WETH_KOVAN = '0xd0A1E359811322d97991E03f863a0C30C2cF029C';
 //const LINK_KOVAN = '0xa36085F69e2889c224210F603D836748e7dC0088';

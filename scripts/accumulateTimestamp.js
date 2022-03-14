@@ -36,10 +36,9 @@ async function main() {
 
     const blockBefore = await ethers.provider.getBlock();
     const timestamp = blockBefore.timestamp;
+    let nextTwoMinuteSlot = timestamp - (timestamp % 120) + 240;
 
-    let nextTwoMinuteSlot = timestamp - (timestamp % 60) + 120;
     let temp = nextTwoMinuteSlot;
-    let temp2 = nextTwoMinuteSlot;
     console.log("Accumulated purchase orders...");
     for(let i = 0; i < 10; i++){
         let purchaseOrder = await contract.accumulatePurchaseOrders(nextTwoMinuteSlot);
@@ -81,14 +80,16 @@ async function main() {
                                                             1,
                                                             25
     );
+    const timestamp2 = blockBefore.timestamp;
+    let nextTwoMinuteSlot2 = timestamp2 - (timestamp2 % 120) + 240;
 
     console.log("Accumulated purchase orders...");
     for(let i = 0; i < 20; i++){
-        let purchaseOrder = await contract.accumulatePurchaseOrders(temp2);
-        temp2 += 120;
-        let date = new Date(temp2 * 1000);
+        let purchaseOrder = await contract.accumulatePurchaseOrders(nextTwoMinuteSlot2);
+        nextTwoMinuteSlot2 += 120;
+        let date = new Date(nextTwoMinuteSlot2 * 1000);
         let time = " "+date.getHours()+ ":"+date.getMinutes()+ ":"+date.getSeconds();
-        console.log("purchaseOrder @", time, "[", temp2, "]: ", purchaseOrder);            
+        console.log("purchaseOrder @", time, "[", nextTwoMinuteSlot2, "]: ", purchaseOrder);            
     }
 }
 

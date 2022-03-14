@@ -19,7 +19,7 @@ contract Gravity is KeeperCompatibleInterface {
 
     event NewStrategy(address);
     event PurchaseExecuted(uint256);    // testing
-    event PurchaseNotExecuted(uint256); // testing
+    event PerformUpkeepFailed(uint256); // testing
     event Deposited(address, uint256);
     event Withdrawn(address, uint256);
 
@@ -104,7 +104,7 @@ contract Gravity is KeeperCompatibleInterface {
                                        _purchasesRemaining);
 
         // populate purchaseOrders mapping
-        uint _unixNextTwoMinSlot = _accountStart - (_accountStart % 60) + 120;
+        uint _unixNextTwoMinSlot = _accountStart - (_accountStart % 120) + 240;
         uint _unixInterval = _interval * 120;
         for(uint i = 1; i <= _purchasesRemaining; i++) {
             uint _nextUnixPurchaseDate = _unixNextTwoMinSlot + (_unixInterval * i);
@@ -117,32 +117,38 @@ contract Gravity is KeeperCompatibleInterface {
         emit NewStrategy(msg.sender);
     }
 
-    // [test] checkUpkeep
+    // [test_timestamp] checkUpkeep
     function checkUpkeep(bytes calldata /* checkData */) external override returns (bool upkeepNeeded, bytes memory /* performData */) {
         require(onOff == true, "Keeper checkUpkeep is off");
         if((block.timestamp - lastTimeStamp) > upKeepInterval) {
-            uint _now = block.timestamp;
-            nextSlot = _now - (_now % 60) + 120;
-            if(priorSlot != nextSlot) {
-                uint _total = accumulatePurchaseOrders(nextSlot);
+            uint256 _now = block.timestamp;
+            uint256 _nextSlot = _now - (_now % 120) + 240;
+            // condition to prevent replay
+            if(_nextSlot > priorSlot) {
+                uint _total = accumulatePurchaseOrders(_nextSlot);
                 if(_total > 0) {
-                    priorSlot = nextSlot;
+
                     upkeepNeeded = true;
                 }
             }
         }
     }
 
-    // [test] performUpkeep
+    // [test_timestamp] performUpkeep
     function performUpkeep(bytes calldata /* performData */) external override {
         //revalidate the upkeep in the performUpkeep function
         require(onOff == true, "Keeper checkUpkeep is off");
-        uint _total = accumulatePurchaseOrders(nextSlot);
+        uint256 _now = block.timestamp;
+        nextSlot = _now - (_now % 120) + 240;
+        uint256 _total = accumulatePurchaseOrders(nextSlot);
         if (_total > 0) {
+            priorSlot = nextSlot;
             /*
             * TO DO: add dex transaction
             */
             emit PurchaseExecuted(block.timestamp);
+        } else {
+            emit PerformUpkeepFailed(block.timestamp);
         }
     }
 
