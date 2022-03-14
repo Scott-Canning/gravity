@@ -61,8 +61,6 @@ contract Gravity is KeeperCompatibleInterface {
         // sourceTokens[address(0xa36085F69e2889c224210F603D836748e7dC0088)] = true; // LINK
     }
 
-
-
     // [test_timestamp] accumulatePurchaseOrders
     function accumulatePurchaseOrders(uint _timestamp) public view returns (uint) {
         uint _total;
@@ -91,7 +89,7 @@ contract Gravity is KeeperCompatibleInterface {
     //                                    _purchasesRemaining);
 
     //     // populate purchaseOrders mapping
-    //     uint _unixTwoMinsFromNow = _accountStart - (_accountStart % 86400) + 86400 + 43200;
+    //     uint _unixNoonToday = _accountStart - (_accountStart % 86400) + 86400 + 43200;
     //     uint _unixInterval = _interval * 86400;
     //     for(uint i = 1; i <= _purchasesRemaining; i++) {
     //         uint _nextUnixPurchaseDate = _unixNoonToday + (_unixInterval * i);
@@ -128,7 +126,11 @@ contract Gravity is KeeperCompatibleInterface {
         uint _unixInterval = _interval * 120;
         for(uint i = 1; i <= _purchasesRemaining; i++) {
             uint _nextUnixPurchaseDate = _unixNextTwoMinSlot + (_unixInterval * i);
+            // TO DO: add check on sufficient sourceBalance, (sourceBalance - scheduledBalance) > purchaseAmount
+            // else, deployment remaining amount (i.e., handle non-even deposits)
             purchaseOrders[_nextUnixPurchaseDate].push(PurchaseOrder(msg.sender, _purchaseAmount));
+            accounts[msg.sender].scheduledBalance += _purchaseAmount;
+            accounts[msg.sender].sourceBalance -= _purchaseAmount;
         }
 
         // Call depositSource to move account holders sourcebalance to Gravity contract
@@ -183,7 +185,7 @@ contract Gravity is KeeperCompatibleInterface {
             /*
             * TO DO: add dex transaction
             */
-            emit PurchaseExecuted(block.timestamp);
+            emit PurchaseExecuted(nextSlot);
         } else {
             emit PerformUpkeepFailed(block.timestamp);
         }
@@ -192,6 +194,32 @@ contract Gravity is KeeperCompatibleInterface {
     /*
     *  - - - - - - - - - - - - keeper integration [end] - - - - - - - - - - - - 
     */
+    
+    // reconstruct deployment schedule of account's strategy, returns associated timestamps and purchase amounts
+    // note: naive implementation (works for un-executed strategies)
+    function reconstructSchedule(address _account) public view returns (uint256[] memory, uint256[] memory) {
+        // get account data
+        uint _accountStart = accounts[_account].accountStart;
+        uint _scheduledBalance = accounts[_account].scheduledBalance;
+        uint _interval = accounts[_account].interval;
+        uint _purchasesRemaining = accounts[_account].purchasesRemaining;
+        uint _purchaseAmount = accounts[_account].purchaseAmount;
+
+        // create temporary arrays to be returned
+        uint[] memory timestamps = new uint[](_purchasesRemaining);
+        uint[] memory purchaseAmounts = new uint[](_purchasesRemaining);
+
+        // reconstruct strategy's deployment schedule
+        uint _unixNextTwoMinSlot = _accountStart - (_accountStart % 120) + 240;
+        uint _unixInterval = _interval * 120;
+        for(uint i = 1; i <= _purchasesRemaining; i++) {
+            uint _nextUnixPurchaseDate = _unixNextTwoMinSlot + (_unixInterval * i);
+            timestamps[i - 1] = _nextUnixPurchaseDate;
+            purchaseAmounts[i - 1] = (_scheduledBalance / _purchasesRemaining);
+        }
+        return(timestamps, purchaseAmounts);
+    }
+
 
     // TO DO: DEX swap
 
