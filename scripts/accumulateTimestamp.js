@@ -4,13 +4,6 @@ const { ethers } = require("hardhat");
 
 async function main() {
 
-
-    // testing accumulation
-    // for(uint i = 0; i < 3; i++) {
-    //     purchaseOrders[i].push(PurchaseOrder(msg.sender, 1));
-    //     purchaseOrders[i].push(PurchaseOrder(msg.sender, 1));
-    // }
-
     //create erc20 TourceToken
     const SourceToken = await ethers.getContractFactory("SourceToken");
     const sourceToken = await SourceToken.deploy();
