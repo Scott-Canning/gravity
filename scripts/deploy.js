@@ -14,7 +14,7 @@ async function deploy() {
 
   let artifacts = await hre.artifacts.readArtifact("Gravity");
   let factory = new ethers.ContractFactory(artifacts.abi, artifacts.bytecode, wallet);
-  let contract = await factory.deploy(sourceToken, targetToken);
+  let contract = await factory.deploy(sourceToken, targetToken, 60); // 30 is to test initial integration
 
   console.log("Contract address:", contract.address);
   await contract.deployed();
