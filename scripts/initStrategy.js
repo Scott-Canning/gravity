@@ -52,7 +52,7 @@ async function main() {
   //console.log('Approve: ', approve);
 
   const initNewStrat = await contract.initiateNewStrategy(sourceToken.address,
-                                                          sourceToken.address,
+                                                          targetToken.address,
                                                           1000,
                                                           1,
                                                           100);

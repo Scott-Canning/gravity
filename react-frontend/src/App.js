@@ -5,7 +5,7 @@ import gravityJSON from './utils/gravity.json';
 import daiJSON from './utils/dai.json';
 import linkJSON from './utils/link.json';
 
-const gravityAddress = '0x5C1Ede612Cbd50cE32dDB899b615823D1F75D0c0';
+const gravityAddress = '0x719d0Dde9F3983b8B34E4F4D250E3c795ddA0f15';
 const DAI_KOVAN = '0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa';
 const WETH_KOVAN = '0xd0A1E359811322d97991E03f863a0C30C2cF029C';
 const LINK_KOVAN = '0xa36085F69e2889c224210F603D836748e7dC0088';
@@ -102,7 +102,7 @@ function App() {
                                                                     depositAmount, 
                                                                     1,
                                                                     purchaseAmount,
-                                                                    {gasLimit: 30000000});
+                                                                    {gasLimit: 1500000}); //30000000
     console.log("initiateNewStrategy: ", initStrategy);
     console.log("source asset address:", tokenAddresses[depositAsset]);
   }
