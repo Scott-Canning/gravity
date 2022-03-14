@@ -5,7 +5,7 @@ import gravityJSON from './utils/gravity.json';
 import daiJSON from './utils/dai.json';
 import linkJSON from './utils/link.json';
 
-const gravityAddress = '0x719d0Dde9F3983b8B34E4F4D250E3c795ddA0f15';
+const gravityAddress = '0x8c052f67b582C1d52Cb3676468BA9B1B255C82Dc';
 const DAI_KOVAN = '0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa';
 const WETH_KOVAN = '0xd0A1E359811322d97991E03f863a0C30C2cF029C';
 const LINK_KOVAN = '0xa36085F69e2889c224210F603D836748e7dC0088';
@@ -88,6 +88,7 @@ function App() {
   }
 
   async function initiateNewStrategy() {
+    //const depositBigNum = ethers.BigNumber.from("depositAmount" + "");
     const signer = await provider.getSigner();
     const tokenInstance = new ethers.Contract(tokenAddresses[depositAsset], contractJSONs[depositAsset], signer);
     console.log("tokenInstance address:", tokenAddresses[depositAsset]);
@@ -99,7 +100,7 @@ function App() {
 
     const initStrategy = await contractInstance.initiateNewStrategy(tokenAddresses[depositAsset], 
                                                                     tokenAddresses['ETH'], 
-                                                                    depositAmount, 
+                                                                    depositAmount,
                                                                     1,
                                                                     purchaseAmount,
                                                                     {gasLimit: 1500000}); //30000000
@@ -164,7 +165,7 @@ function App() {
             <input  value={purchaseAmount} onInput={e => setPurchaseAmount(e.target.value)}/>
           </div>
           <div className="deposit-button">
-            <button onClick={initiateNewStrategy}> initiateNewStrategy </button>
+            <button onClick={initiateNewStrategy}> Initiate Strategy </button>
           </div>
         </div>
         

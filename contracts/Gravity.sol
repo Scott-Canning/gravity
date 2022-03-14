@@ -1,16 +1,52 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.0;
-import "hardhat/console.sol";
+
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@chainlink/contracts/src/v0.8/KeeperCompatible.sol";
+
+interface IUniswapV2Router {
+  function getAmountsOut(uint256 amountIn, address[] memory path)
+    external
+    view
+    returns (uint256[] memory amounts);
+  
+  function swapExactTokensForTokens(
+    //amount of tokens we are sending in
+    uint256 amountIn,
+    //the minimum amount of tokens we want out of the trade
+    uint256 amountOutMin,
+    //list of token addresses we are going to trade in.  this is necessary to calculate amounts
+    address[] calldata path,
+    //this is the address we are going to send the output tokens to
+    address to,
+    //the last time that the trade is valid for
+    uint256 deadline
+  ) external returns (uint256[] memory amounts);
+}
+
+interface IUniswapV2Pair {
+  function token0() external view returns (address);
+  function token1() external view returns (address);
+  function swap(
+    uint256 amount0Out,
+    uint256 amount1Out,
+    address to,
+    bytes calldata data
+  ) external;
+}
+
+interface IUniswapV2Factory {
+  function getPair(address token0, address token1) external returns (address);
+}
 
 contract Gravity is KeeperCompatibleInterface {
     address payable owner;
     bool public onOff = true;                                   // [testing] toggle Keeper on/off
     uint public immutable upKeepInterval;
     uint public lastTimeStamp;
-    uint public priorSlot;
-    uint public nextSlot = 1;
+
+    address private constant UNISWAP_V2_ROUTER = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
+    address private constant WETH = 0xd0A1E359811322d97991E03f863a0C30C2cF029C;
 
     mapping (address => Account) public accounts;               // user address => user Account
     mapping (address => bool) public sourceTokens;              // mapping for supported tokens
@@ -43,8 +79,8 @@ contract Gravity is KeeperCompatibleInterface {
 
     constructor(address _sourceToken, address _targetToken, uint _upKeepInterval) {
         owner = payable(msg.sender);
-        // keeper variables
-        upKeepInterval = _upKeepInterval; // in seconds
+        // keeper variables (in seconds)
+        upKeepInterval = _upKeepInterval;
         lastTimeStamp = block.timestamp;
 
         // for testing
@@ -60,6 +96,48 @@ contract Gravity is KeeperCompatibleInterface {
         // sourceTokens[address(0xd0A1E359811322d97991E03f863a0C30C2cF029C)] = true; // WETH
         // sourceTokens[address(0xa36085F69e2889c224210F603D836748e7dC0088)] = true; // LINK
     }
+
+    function swap(address _tokenIn, address _tokenOut, uint256 _amountIn, uint256 _amountOutMin, address _to) internal {
+        // approve uniswapv2
+        IERC20(_tokenIn).approve(UNISWAP_V2_ROUTER, _amountIn);
+        // path array has 3 addresses [tokenIn, WETH, tokenOut]; if token in/out is WETH, then the path is only 2 addresses
+        address[] memory path;
+        if (_tokenIn == WETH || _tokenOut == WETH) {
+            path = new address[](2);
+            path[0] = _tokenIn;
+            path[1] = _tokenOut;
+        } else {
+            path = new address[](3);
+            path[0] = _tokenIn;
+            path[1] = WETH;
+            path[2] = _tokenOut;
+        }
+
+        // pass block.timestampfor deadline (latest time the trade is valid for)
+        IUniswapV2Router(UNISWAP_V2_ROUTER).swapExactTokensForTokens(_amountIn, _amountOutMin, path, _to, block.timestamp);
+    }
+    
+    // TO DO: integrate into performUpkeep
+    // returns the minimum amount from a swap this is needed for the swap function above
+    function getAmountOutMin(address _tokenIn, address _tokenOut, uint256 _amountIn) external view returns (uint256) {
+
+        // path array has 3 addresses [tokenIn, WETH, tokenOut]
+        // if token in/out is WETH, then the path is only 2 addresses
+        address[] memory path;
+        if (_tokenIn == WETH || _tokenOut == WETH) {
+            path = new address[](2);
+            path[0] = _tokenIn;
+            path[1] = _tokenOut;
+        } else {
+            path = new address[](3);
+            path[0] = _tokenIn;
+            path[1] = WETH;
+            path[2] = _tokenOut;
+        }
+        
+        uint256[] memory amountOutMins = IUniswapV2Router(UNISWAP_V2_ROUTER).getAmountsOut(_amountIn, path);
+        return amountOutMins[path.length -1];  
+    }  
 
     // [test_timestamp] accumulatePurchaseOrders
     function accumulatePurchaseOrders(uint _timestamp) public view returns (uint) {
@@ -138,10 +216,6 @@ contract Gravity is KeeperCompatibleInterface {
         emit NewStrategy(msg.sender);
     }
 
-    /*
-    * - - - - - - - - - - - - keeper integration [start] - - - - - - - - - - - - 
-    */
-
     // [production] checkUpkeep
     // function checkUpkeep(bytes calldata /* checkData */) external override returns (bool upkeepNeeded, bytes memory /* performData */) {
     //     require(onOff == true, "Keeper checkUpkeep is off");
@@ -163,12 +237,9 @@ contract Gravity is KeeperCompatibleInterface {
         if((block.timestamp - lastTimeStamp) > upKeepInterval) {
             uint256 _now = block.timestamp;
             uint256 _nextSlot = _now - (_now % 120) + 240;
-            // condition to prevent replay
-            if(_nextSlot > priorSlot) {
-                uint _total = accumulatePurchaseOrders(_nextSlot);
-                if(_total > 0) {
-                    upkeepNeeded = true;
-                }
+            uint _total = accumulatePurchaseOrders(_nextSlot);
+            if(_total > 0) {
+                upkeepNeeded = true;
             }
         }
     }
@@ -178,25 +249,24 @@ contract Gravity is KeeperCompatibleInterface {
         //revalidate the upkeep in the performUpkeep function
         require(onOff == true, "Keeper checkUpkeep is off");
         uint256 _now = block.timestamp;
-        nextSlot = _now - (_now % 120) + 240;
-        uint256 _total = accumulatePurchaseOrders(nextSlot);
+        uint256 _nextSlot = _now - (_now % 120) + 240;
+        uint _total = accumulatePurchaseOrders(_nextSlot);
+        lastTimeStamp = block.timestamp;
         if (_total > 0) {
-            priorSlot = nextSlot; // replay prevention
-            /*
-            * TO DO: add dex transaction
-            */
-            emit PurchaseExecuted(nextSlot);
+
+            swap(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa, 
+                 0xd0A1E359811322d97991E03f863a0C30C2cF029C,
+                 _total,
+                 0,
+                 address(this));
+
+            emit PurchaseExecuted(_nextSlot);
         } else {
             emit PerformUpkeepFailed(block.timestamp);
         }
     }
 
-    /*
-    *  - - - - - - - - - - - - keeper integration [end] - - - - - - - - - - - - 
-    */
-    
-    // reconstruct deployment schedule of account's strategy, returns associated timestamps and purchase amounts
-    // note: naive implementation (works for un-executed strategies)
+    // reconstruct deployment schedule of account's strategy; naive implementation (works for un-executed strategies)
     function reconstructSchedule(address _account) public view returns (uint256[] memory, uint256[] memory) {
         // get account data
         uint _accountStart = accounts[_account].accountStart;
@@ -220,11 +290,6 @@ contract Gravity is KeeperCompatibleInterface {
         return(timestamps, purchaseAmounts);
     }
 
-
-    // TO DO: DEX swap
-
-    // TO DO: Aave deposit stablecoins
-
     // TO DO: update to handle depositing into existing strategy
     // deposit into existing strategy (basic implementation for single source; would updating strategy)
     function depositSource(address _token, uint256 _amount) internal {
@@ -235,9 +300,9 @@ contract Gravity is KeeperCompatibleInterface {
         emit Deposited(msg.sender, _amount);
     }
 
-        // TO do testing for partial withdrawal of LIVE strategy
-     function withdraw() external {
-        
+    // TO DO: update to handle withdrawing from existing strategy
+    // TO do testing for partial withdrawal of LIVE strategy
+    function withdraw() external {
         require(accounts[msg.sender].accountStart > 0, "Withdraw Address is Invalid");
         require(!(accounts[msg.sender].withdrawFlag), "Account is withdrawn");
 
