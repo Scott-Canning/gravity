@@ -32,52 +32,101 @@
   text-align: left;
   font-size: 3rem;
   font-family: futura;
-  margin: 1rem;
+  padding: 1rem;
 }
 
 .user-info {
   text-align: left;
   font-size: 16px;
   font-family: futura;
-  margin: 1rem;
+  padding: 1rem;
+}
+
+.user-balances {
+  text-align: left;
+  font-size: 16px;
+  font-family: futura;
+  padding: 1rem;
+}
+
+/* Manage Strategies */
+
+.container {
+  display: block;
+  float: left;
+  text-align: left;
+  font-size: 16px;
+  font-family: futura;
+  padding: 1rem;
+  height: auto;
+  width: 90%;
+}
+
+.container b {
+  margin: 5px;
+  padding: 5px;
 }
 
 .deposit {
+  float: left;
   text-align: left;
   font-size: 16px;
   font-family: futura;
-  margin: 1rem;
-}
-
-.deposit-input {
-  padding: 1rem;
+  width: 45%;
+  height: 200px;
+  position: relative;
   border-color: black;
-  font-size: 16px;
-}
-
-.deposit-button {
-  font-size: 16px;
-  font-family: futura;
-  margin: 1rem;
+  border-width: 1px;
+  border-style: dashed;
+  /* background-color: lightgray; */
 }
 
 .withdraw {
+  float: right;
   text-align: left;
   font-size: 16px;
   font-family: futura;
-  margin: 1rem;
+  width: 45%;
+  height: 200px;
+  position: relative;
+  border-color: black;
+  border-width: 1px;
+  border-style: dashed;
+  /* background-color: lightgray; */
 }
 
-.withdraw-input {
+button {
+  display: flex;
+  font-size: 16px;
+  font-family: futura;
+  margin: 10px;
+  padding: 5px;
+  bottom: 0px;
+  position: absolute;
+}
+
+.input-row {
   padding: 1rem;
   border-color: black;
   font-size: 16px;
+  height: auto;
 }
 
-.withdraw-button {
+.input-row label {
+  float: left;
+}
+
+.input-row input {
+  float: right;
+}
+
+/* My Strategies */
+
+.user-strategies {
+  text-align: left;
   font-size: 16px;
   font-family: futura;
-  margin: 1rem;
+  padding: 1rem;
 }
 
 @keyframes App-logo-spin {
