@@ -1,14 +1,15 @@
 import { ethers } from 'ethers';
 import './App.css';
 import React from 'react';
+import { GRAVITY_KOVAN, DAI_KOVAN, WETH_KOVAN, LINK_KOVAN } from './Addresses.js';
 import gravityJSON from './utils/gravity.json';
 import daiJSON from './utils/dai.json';
 import linkJSON from './utils/link.json';
 
-const gravityAddress = '0x8c052f67b582C1d52Cb3676468BA9B1B255C82Dc';
-const DAI_KOVAN = '0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa';
-const WETH_KOVAN = '0xd0A1E359811322d97991E03f863a0C30C2cF029C';
-const LINK_KOVAN = '0xa36085F69e2889c224210F603D836748e7dC0088';
+const GRAVITY = GRAVITY_KOVAN;
+const DAI = DAI_KOVAN;
+const WETH = WETH_KOVAN;
+const LINK = LINK_KOVAN;
 
 function App() {
   const [address, setAddress] = React.useState("");
@@ -70,7 +71,7 @@ function App() {
 
     // Display puchase orders
 
-    const contractInstance = new ethers.Contract(gravityAddress, gravityJSON, signer);
+    const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
     const purchaseOrders = await contractInstance.purchaseOrders;
     const poCount = purchaseOrders.length;
     //console.log("PURCHASE ORDERS: ", purchaseOrders);
@@ -92,10 +93,10 @@ function App() {
     const signer = await provider.getSigner();
     const tokenInstance = new ethers.Contract(tokenAddresses[depositAsset], contractJSONs[depositAsset], signer);
     console.log("tokenInstance address:", tokenAddresses[depositAsset]);
-    const approve = await tokenInstance.approve(gravityAddress, depositAmount);
+    const approve = await tokenInstance.approve(GRAVITY, depositAmount);
     console.log("approve: ", approve);
 
-    const contractInstance = new ethers.Contract(gravityAddress, gravityJSON, signer);
+    const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
 
 
     const initStrategy = await contractInstance.initiateNewStrategy(tokenAddresses[depositAsset], 
@@ -110,7 +111,7 @@ function App() {
 
   async function withdraw() {
     const signer = await provider.getSigner();
-    const contractInstance = new ethers.Contract(gravityAddress, gravityJSON, signer);
+    const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
     const withdraw = await contractInstance.withdraw(withdrawAsset, withdrawAmount, {gasLimit: 350000});
     console.log("deposit: ", withdraw);
   }
@@ -124,7 +125,7 @@ function App() {
         <h3>Contract Details</h3>
         <ul>
           <li>
-            Contract address: {gravityAddress}
+            Contract address: {GRAVITY}
           </li>
           <li>
             Your address: {address}

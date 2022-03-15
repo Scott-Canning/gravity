@@ -269,6 +269,7 @@ contract Gravity is KeeperCompatibleInterface {
         uint    _sourceBalance      = accounts[msg.sender].sourceBalance;
         uint    _targetBalance      = accounts[msg.sender].targetBalance;
 
+
         accounts[msg.sender].withdrawFlag = true;
         bool success;
 
@@ -276,7 +277,6 @@ contract Gravity is KeeperCompatibleInterface {
             require(_sourceBalance > 0,"For zero investment, _sourceBalance is zero");
             
             if(IERC20(_sourceToken).balanceOf(address(this)) < _sourceBalance){
-                
                 // TO DO: if treasury do not have enough source asset token, make call to Aave for retrieval
             }
 
