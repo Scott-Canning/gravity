@@ -318,10 +318,6 @@ contract Gravity is KeeperCompatibleInterface {
         uint _sourceBalance = accounts[msg.sender].sourceBalance;
         uint _targetBalance = accounts[msg.sender].targetBalance;
 
-        console.log("_purchasesRemaining",_purchasesRemaining);
-        console.log("_targetBalance",_targetBalance);
-        console.log("_sourceBalance",_sourceBalance);
-
         accounts[msg.sender].withdrawFlag = true;
         bool success;
 
@@ -329,7 +325,6 @@ contract Gravity is KeeperCompatibleInterface {
             require(_sourceBalance > 0,"For zero investment, _sourceBalance is zero");
             
             if(IERC20(_sourceToken).balanceOf(address(this)) < _sourceBalance){
-                console.log("Less balance source");
                 // TO DO: if treasury do not have enough source asset token, make call to Aave for retrieval
             }
 
@@ -341,7 +336,6 @@ contract Gravity is KeeperCompatibleInterface {
             require(_targetBalance > 0,"Insufficient source asset balance");
 
             if(IERC20(_targetToken).balanceOf(address(this)) < _targetBalance){
-                console.log("Less balance target");
                 // TO DO: if treasury do not have enough target asset token, make call to Aave for retrieval
             }
 
@@ -354,12 +348,10 @@ contract Gravity is KeeperCompatibleInterface {
             require(_targetBalance > 0,"Insufficient target asset balance for partial withdrawal");
 
             if(IERC20(_targetToken).balanceOf(address(this)) < _targetBalance){
-                console.log("Less balance target");
                 // TO DO: if treasury do not have enough target asset token, make call to AAVE for retrieval
             }
 
             if(IERC20(_sourceToken).balanceOf(address(this)) < _sourceBalance){
-              console.log("Less balance source");
               // TO DO: if treasury do not have enough source asset token, make call to AAVE for retrieval
             }
 
