@@ -1,43 +1,11 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.0;
+pragma abicoder v2;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@chainlink/contracts/src/v0.8/KeeperCompatible.sol";
-
-interface IUniswapV2Router {
-  function getAmountsOut(uint256 amountIn, address[] memory path)
-    external
-    view
-    returns (uint256[] memory amounts);
-  
-  function swapExactTokensForTokens(
-    //amount of tokens we are sending in
-    uint256 amountIn,
-    //the minimum amount of tokens we want out of the trade
-    uint256 amountOutMin,
-    //list of token addresses we are going to trade in.  this is necessary to calculate amounts
-    address[] calldata path,
-    //this is the address we are going to send the output tokens to
-    address to,
-    //the last time that the trade is valid for
-    uint256 deadline
-  ) external returns (uint256[] memory amounts);
-}
-
-interface IUniswapV2Pair {
-  function token0() external view returns (address);
-  function token1() external view returns (address);
-  function swap(
-    uint256 amount0Out,
-    uint256 amount1Out,
-    address to,
-    bytes calldata data
-  ) external;
-}
-
-interface IUniswapV2Factory {
-  function getPair(address token0, address token1) external returns (address);
-}
+import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
+import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 
 contract Gravity is KeeperCompatibleInterface {
     address payable owner;
@@ -45,7 +13,7 @@ contract Gravity is KeeperCompatibleInterface {
     uint public immutable upKeepInterval;
     uint public lastTimeStamp;
 
-    address private constant UNISWAP_V2_ROUTER = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
+    address private constant UNISWAP_V3_ROUTER = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
     address private constant WETH = 0xd0A1E359811322d97991E03f863a0C30C2cF029C;
 
     mapping (address => Account) public accounts;               // user address => user Account
