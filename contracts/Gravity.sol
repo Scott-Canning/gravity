@@ -13,12 +13,8 @@ contract Gravity is KeeperCompatibleInterface {
     uint public immutable upKeepInterval;
     uint public lastTimeStamp;
 
-    ISwapRouter public immutable swapRouter = 
-    ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);  // Uniswap V3
-    uint24 public constant poolFee = 3000;                      // For this example, we will set the pool fee to 0.3%.
-    
-    
-   // address private constant WETH = 0xd0A1E359811322d97991E03f863a0C30C2cF029C;
+    uint24 public constant poolFee = 3000;                      // pool fee set to 0.3%
+    ISwapRouter public immutable swapRouter = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);  // UniswapV3
 
     mapping (address => Account) public accounts;               // user address => user Account
     mapping (address => bool) public sourceTokens;              // mapping for supported tokens
@@ -26,8 +22,8 @@ contract Gravity is KeeperCompatibleInterface {
     mapping (uint => PurchaseOrder[]) public purchaseOrders;
 
     event NewStrategy(address);
-    event PurchaseExecuted(uint256);                            // testing
-    event PerformUpkeepFailed(uint256);                         // testing
+    event PurchaseExecuted(uint, uint);
+    event PerformUpkeepFailed(uint256);
     event Deposited(address, uint256);
     event Withdrawn(address, uint256);
 
@@ -70,7 +66,7 @@ contract Gravity is KeeperCompatibleInterface {
     }
 
     function swap(address _tokenIn, address _tokenOut, uint256 amountIn, uint256 _amountOutMin) internal returns (uint256 amountOut) {
-        // Approve the router to spend DAI.
+        // approve the router to spend DAI.
         TransferHelper.safeApprove(_tokenIn, address(swapRouter), amountIn);
 
         // Naively set amountOutMinimum to 0. In production, use an oracle or other data source to choose a safer value for amountOutMinimum.
@@ -140,6 +136,11 @@ contract Gravity is KeeperCompatibleInterface {
         require(_interval == 1 || _interval == 7 || _interval == 14 || _interval == 21 || _interval == 30, "Unsupported interval");
         uint _accountStart = block.timestamp;
         uint _purchasesRemaining = _sourceBalance / _purchaseAmount;
+        
+        if((_sourceBalance % _purchaseAmount) != 0) {
+            _purchasesRemaining += 1;
+        }
+
         accounts[msg.sender] = Account(_accountStart, 
                                        _sourceAsset, 
                                        _targetAsset, 
@@ -152,15 +153,20 @@ contract Gravity is KeeperCompatibleInterface {
                                        false);
 
         // populate purchaseOrders mapping
-        uint _unixNextSlot = _accountStart - (_accountStart % upKeepInterval) + 2*upKeepInterval;
+        uint _unixNextSlot = _accountStart - (_accountStart % upKeepInterval) + 2 * upKeepInterval;
         uint _unixInterval = _interval * upKeepInterval;
         for(uint i = 1; i <= _purchasesRemaining; i++) {
             uint _nextUnixPurchaseDate = _unixNextSlot + (_unixInterval * i);
-            // TO DO: add check on sufficient sourceBalance, (sourceBalance - scheduledBalance) > purchaseAmount
-            // else, deployment remaining amount (i.e., handle non-even deposits)
-            purchaseOrders[_nextUnixPurchaseDate].push(PurchaseOrder(msg.sender, _purchaseAmount));
-            accounts[msg.sender].scheduledBalance += _purchaseAmount;
-            //accounts[msg.sender].sourceBalance -= _purchaseAmount;
+            if(accounts[msg.sender].sourceBalance - accounts[msg.sender].scheduledBalance > accounts[msg.sender].purchaseAmount) {
+                purchaseOrders[_nextUnixPurchaseDate].push(PurchaseOrder(msg.sender, _purchaseAmount));
+                accounts[msg.sender].scheduledBalance += _purchaseAmount;
+                accounts[msg.sender].sourceBalance -= _purchaseAmount;
+            } else {
+                uint _stubPurchaseAmount = accounts[msg.sender].sourceBalance - accounts[msg.sender].scheduledBalance;
+                purchaseOrders[_nextUnixPurchaseDate].push(PurchaseOrder(msg.sender, _stubPurchaseAmount);
+                accounts[msg.sender].scheduledBalance += _stubPurchaseAmount;
+                accounts[msg.sender].sourceBalance -= _stubPurchaseAmount;
+            }
         }
 
         // Call depositSource to move account holders sourcebalance to Gravity contract
@@ -187,8 +193,8 @@ contract Gravity is KeeperCompatibleInterface {
     function checkUpkeep(bytes calldata /* checkData */) external override returns (bool upkeepNeeded, bytes memory /* performData */) {
         require(onOff == true, "Keeper checkUpkeep is off");
         if((block.timestamp - lastTimeStamp) > upKeepInterval) {
-            uint256 _now = block.timestamp;
-            uint256 _nextSlot = _now - (_now % upKeepInterval) + 2*upKeepInterval;
+            uint _now = block.timestamp;
+            uint _nextSlot = _now - (_now % upKeepInterval) + 2 * upKeepInterval;
             uint _total = accumulatePurchaseOrders(_nextSlot);
             if(_total > 0) {
                 upkeepNeeded = true;
@@ -200,18 +206,21 @@ contract Gravity is KeeperCompatibleInterface {
     function performUpkeep(bytes calldata /* performData */) external override {
         //revalidate the upkeep in the performUpkeep function
         require(onOff == true, "Keeper checkUpkeep is off");
-        uint256 _now = block.timestamp;
-        uint256 _nextSlot = _now - (_now % upKeepInterval) + 2*upKeepInterval;
+        uint _now = block.timestamp;
+        uint _nextSlot = _now - (_now % upKeepInterval) + 2 * upKeepInterval;
         uint _total = accumulatePurchaseOrders(_nextSlot);
         lastTimeStamp = block.timestamp;
         if (_total > 0) {
 
-           uint amountOut = swap(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa, 
-                                0xd0A1E359811322d97991E03f863a0C30C2cF029C,
-                                _total
-                                ,0);
+            uint256 _totalPurchase = swap(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa, 
+                                     0xd0A1E359811322d97991E03f863a0C30C2cF029C,
+                                     _total
+                                     ,0);
 
-            emit PurchaseExecuted(_nextSlot);
+            // update scheduledBalances and targetBalances
+            
+
+            emit PurchaseExecuted(_nextSlot, _totalPurchase);
         } else {
             emit PerformUpkeepFailed(block.timestamp);
         }
