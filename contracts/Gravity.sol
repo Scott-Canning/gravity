@@ -13,8 +13,12 @@ contract Gravity is KeeperCompatibleInterface {
     uint public immutable upKeepInterval;
     uint public lastTimeStamp;
 
-    address private constant UNISWAP_V3_ROUTER = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
-    address private constant WETH = 0xd0A1E359811322d97991E03f863a0C30C2cF029C;
+    ISwapRouter public immutable swapRouter = 
+    ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);  // Uniswap V3
+    uint24 public constant poolFee = 3000;                      // For this example, we will set the pool fee to 0.3%.
+    
+    
+   // address private constant WETH = 0xd0A1E359811322d97991E03f863a0C30C2cF029C;
 
     mapping (address => Account) public accounts;               // user address => user Account
     mapping (address => bool) public sourceTokens;              // mapping for supported tokens
@@ -50,7 +54,7 @@ contract Gravity is KeeperCompatibleInterface {
         // keeper variables (in seconds)
         upKeepInterval = _upKeepInterval;
         lastTimeStamp = block.timestamp;
-
+        
         // for testing
         sourceTokens[address(_sourceToken)] = true; // TestToken (testing only)
         targetTokens[address(_targetToken)] = true;
@@ -65,48 +69,28 @@ contract Gravity is KeeperCompatibleInterface {
         // sourceTokens[address(0xa36085F69e2889c224210F603D836748e7dC0088)] = true; // LINK
     }
 
-    function swap(address _tokenIn, address _tokenOut, uint256 _amountIn, uint256 _amountOutMin, address _to) internal {
-        // approve uniswapv2
-        IERC20(_tokenIn).approve(UNISWAP_V2_ROUTER, _amountIn);
-        // path array has 3 addresses [tokenIn, WETH, tokenOut]; if token in/out is WETH, then the path is only 2 addresses
-        address[] memory path;
-        if (_tokenIn == WETH || _tokenOut == WETH) {
-            path = new address[](2);
-            path[0] = _tokenIn;
-            path[1] = _tokenOut;
-        } else {
-            path = new address[](3);
-            path[0] = _tokenIn;
-            path[1] = WETH;
-            path[2] = _tokenOut;
-        }
+    function swap(address _tokenIn, address _tokenOut, uint256 amountIn, uint256 _amountOutMin) internal returns (uint256 amountOut) {
+        // Approve the router to spend DAI.
+        TransferHelper.safeApprove(_tokenIn, address(swapRouter), amountIn);
 
-        // pass block.timestampfor deadline (latest time the trade is valid for)
-        IUniswapV2Router(UNISWAP_V2_ROUTER).swapExactTokensForTokens(_amountIn, _amountOutMin, path, _to, block.timestamp);
+        // Naively set amountOutMinimum to 0. In production, use an oracle or other data source to choose a safer value for amountOutMinimum.
+        // We also set the sqrtPriceLimitx96 to be 0 to ensure we swap our exact input amount.
+        ISwapRouter.ExactInputSingleParams memory params =
+            ISwapRouter.ExactInputSingleParams({
+                tokenIn: _tokenIn,
+                tokenOut: _tokenOut,
+                fee: poolFee,
+                recipient: address(this),
+                deadline: block.timestamp,
+                amountIn: amountIn,
+                amountOutMinimum: _amountOutMin,
+                sqrtPriceLimitX96: 0
+            });
+
+        // The call to `exactInputSingle` executes the swap.
+        amountOut = swapRouter.exactInputSingle(params);
     }
     
-    // TO DO: integrate into performUpkeep
-    // returns the minimum amount from a swap this is needed for the swap function above
-    function getAmountOutMin(address _tokenIn, address _tokenOut, uint256 _amountIn) external view returns (uint256) {
-
-        // path array has 3 addresses [tokenIn, WETH, tokenOut]
-        // if token in/out is WETH, then the path is only 2 addresses
-        address[] memory path;
-        if (_tokenIn == WETH || _tokenOut == WETH) {
-            path = new address[](2);
-            path[0] = _tokenIn;
-            path[1] = _tokenOut;
-        } else {
-            path = new address[](3);
-            path[0] = _tokenIn;
-            path[1] = WETH;
-            path[2] = _tokenOut;
-        }
-        
-        uint256[] memory amountOutMins = IUniswapV2Router(UNISWAP_V2_ROUTER).getAmountsOut(_amountIn, path);
-        return amountOutMins[path.length -1];  
-    }  
-
     // [test_timestamp] accumulatePurchaseOrders
     function accumulatePurchaseOrders(uint _timestamp) public view returns (uint) {
         uint _total;
@@ -168,15 +152,15 @@ contract Gravity is KeeperCompatibleInterface {
                                        false);
 
         // populate purchaseOrders mapping
-        uint _unixNextTwoMinSlot = _accountStart - (_accountStart % 120) + 240;
-        uint _unixInterval = _interval * 120;
+        uint _unixNextSlot = _accountStart - (_accountStart % upKeepInterval) + 2*upKeepInterval;
+        uint _unixInterval = _interval * upKeepInterval;
         for(uint i = 1; i <= _purchasesRemaining; i++) {
-            uint _nextUnixPurchaseDate = _unixNextTwoMinSlot + (_unixInterval * i);
+            uint _nextUnixPurchaseDate = _unixNextSlot + (_unixInterval * i);
             // TO DO: add check on sufficient sourceBalance, (sourceBalance - scheduledBalance) > purchaseAmount
             // else, deployment remaining amount (i.e., handle non-even deposits)
             purchaseOrders[_nextUnixPurchaseDate].push(PurchaseOrder(msg.sender, _purchaseAmount));
             accounts[msg.sender].scheduledBalance += _purchaseAmount;
-            accounts[msg.sender].sourceBalance -= _purchaseAmount;
+            //accounts[msg.sender].sourceBalance -= _purchaseAmount;
         }
 
         // Call depositSource to move account holders sourcebalance to Gravity contract
@@ -204,7 +188,7 @@ contract Gravity is KeeperCompatibleInterface {
         require(onOff == true, "Keeper checkUpkeep is off");
         if((block.timestamp - lastTimeStamp) > upKeepInterval) {
             uint256 _now = block.timestamp;
-            uint256 _nextSlot = _now - (_now % 120) + 240;
+            uint256 _nextSlot = _now - (_now % upKeepInterval) + 2*upKeepInterval;
             uint _total = accumulatePurchaseOrders(_nextSlot);
             if(_total > 0) {
                 upkeepNeeded = true;
@@ -217,16 +201,15 @@ contract Gravity is KeeperCompatibleInterface {
         //revalidate the upkeep in the performUpkeep function
         require(onOff == true, "Keeper checkUpkeep is off");
         uint256 _now = block.timestamp;
-        uint256 _nextSlot = _now - (_now % 120) + 240;
+        uint256 _nextSlot = _now - (_now % upKeepInterval) + 2*upKeepInterval;
         uint _total = accumulatePurchaseOrders(_nextSlot);
         lastTimeStamp = block.timestamp;
         if (_total > 0) {
 
-            swap(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa, 
-                 0xd0A1E359811322d97991E03f863a0C30C2cF029C,
-                 _total,
-                 0,
-                 address(this));
+           uint amountOut = swap(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa, 
+                                0xd0A1E359811322d97991E03f863a0C30C2cF029C,
+                                _total
+                                ,0);
 
             emit PurchaseExecuted(_nextSlot);
         } else {
@@ -280,15 +263,11 @@ contract Gravity is KeeperCompatibleInterface {
         // 3. Withdraw if partial purchases were made, withdraw _sourceBalance-totalinvestedAmount of type _sourceAsset 
         //    and totalinvestedAmount of type _targetAsset to user
 
-        uint _purchasesRemaining = accounts[msg.sender].purchasesRemaining;
-        address _sourceToken = accounts[msg.sender].sourceAsset;
-        address _targetToken = accounts[msg.sender].targetAsset;
-        uint _sourceBalance = accounts[msg.sender].sourceBalance;
-        uint _targetBalance = accounts[msg.sender].targetBalance;
-
-        console.log("_purchasesRemaining",_purchasesRemaining);
-        console.log("_targetBalance",_targetBalance);
-        console.log("_sourceBalance",_sourceBalance);
+        uint    _purchasesRemaining = accounts[msg.sender].purchasesRemaining;
+        address _sourceToken        = accounts[msg.sender].sourceAsset;
+        address _targetToken        = accounts[msg.sender].targetAsset;
+        uint    _sourceBalance      = accounts[msg.sender].sourceBalance;
+        uint    _targetBalance      = accounts[msg.sender].targetBalance;
 
         accounts[msg.sender].withdrawFlag = true;
         bool success;
@@ -297,7 +276,7 @@ contract Gravity is KeeperCompatibleInterface {
             require(_sourceBalance > 0,"For zero investment, _sourceBalance is zero");
             
             if(IERC20(_sourceToken).balanceOf(address(this)) < _sourceBalance){
-                console.log("Less balance source");
+                
                 // TO DO: if treasury do not have enough source asset token, make call to Aave for retrieval
             }
 
@@ -309,7 +288,6 @@ contract Gravity is KeeperCompatibleInterface {
             require(_targetBalance > 0,"Insufficient source asset balance");
 
             if(IERC20(_targetToken).balanceOf(address(this)) < _targetBalance){
-                console.log("Less balance target");
                 // TO DO: if treasury do not have enough target asset token, make call to Aave for retrieval
             }
 
@@ -322,12 +300,10 @@ contract Gravity is KeeperCompatibleInterface {
             require(_targetBalance > 0,"Insufficient target asset balance for partial withdrawal");
 
             if(IERC20(_targetToken).balanceOf(address(this)) < _targetBalance){
-                console.log("Less balance target");
                 // TO DO: if treasury do not have enough target asset token, make call to AAVE for retrieval
             }
 
             if(IERC20(_sourceToken).balanceOf(address(this)) < _sourceBalance){
-              console.log("Less balance source");
               // TO DO: if treasury do not have enough source asset token, make call to AAVE for retrieval
             }
 
@@ -353,4 +329,4 @@ contract Gravity is KeeperCompatibleInterface {
     }
 
     receive() external payable {}
-}
+}     
