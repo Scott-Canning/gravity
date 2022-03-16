@@ -41,14 +41,14 @@ async function main() {
         nextTwoMinuteSlot += 120;
     }
 
-    await sourceToken.approve(contract.address, 1000);
+    await sourceToken.approve(contract.address, 1050);
 
     //function initiateNewStrategy(address _sourceAsset, address _targetAsset, uint _sourceBalance, uint _interval, uint _purchaseAmount) public
     console.log("Signer1 initiating strategy: 1000 uints, 120 second interval, 100 purchaseAmount...")
     await contract.initiateNewStrategy(
                                         sourceToken.address,
                                         targetToken.address,
-                                        1000,
+                                        1050,
                                         1,
                                         100
     );

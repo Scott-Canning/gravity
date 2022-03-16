@@ -7,6 +7,7 @@ import "@chainlink/contracts/src/v0.8/KeeperCompatible.sol";
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 
+
 contract Gravity is KeeperCompatibleInterface {
     address payable owner;
     bool public onOff = true;                                   // [testing] toggle Keeper on/off
@@ -14,7 +15,8 @@ contract Gravity is KeeperCompatibleInterface {
     uint public lastTimeStamp;
 
     uint24 public constant poolFee = 3000;                      // pool fee set to 0.3%
-    ISwapRouter public immutable swapRouter = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);  // UniswapV3
+    ISwapRouter public immutable swapRouter = 
+    ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);    // UniswapV3
 
     mapping (address => Account) public accounts;               // user address => user Account
     mapping (address => bool) public sourceTokens;              // mapping for supported tokens
@@ -24,8 +26,9 @@ contract Gravity is KeeperCompatibleInterface {
     event NewStrategy(address);
     event PurchaseExecuted(uint timestamp, uint targetPurchased);
     event PerformUpkeepFailed(uint timestamp);
-    event Deposited(address, uint256 sourceDeposit);
-    event Withdrawn(address, uint256);
+    event Deposited(address from, uint256 sourceDeposited);
+    event WithdrawnTarget(address to, uint256 targetWithdrawn);
+    event WithdrawnSource(address to, uint256 sourceWithdrawn);
 
     struct Account {
         uint            accountStart;
@@ -43,7 +46,7 @@ contract Gravity is KeeperCompatibleInterface {
     struct PurchaseOrder {
         address user;
         uint    purchaseAmount;
-    }    
+    }
 
     constructor(address _sourceToken, address _targetToken, uint _upKeepInterval) {
         owner = payable(msg.sender);
@@ -140,7 +143,7 @@ contract Gravity is KeeperCompatibleInterface {
         
         // handle remainder purchaseAmounts
         if((_sourceBalance % _purchaseAmount) > 0) {
-            _purchasesRemaining = _purchasesRemaining + 1;
+            _purchasesRemaining += 1;
         }
 
         accounts[msg.sender] = Account(_accountStart, 
@@ -159,12 +162,11 @@ contract Gravity is KeeperCompatibleInterface {
         uint _unixInterval = _interval * upKeepInterval;
         for(uint i = 1; i <= _purchasesRemaining; i++) {
             uint _nextUnixPurchaseDate = _unixNextSlot + (_unixInterval * i);
-            if(accounts[msg.sender].sourceBalance > accounts[msg.sender].purchaseAmount) {
+            if(accounts[msg.sender].sourceBalance >= accounts[msg.sender].purchaseAmount) {
                 purchaseOrders[_nextUnixPurchaseDate].push(PurchaseOrder(msg.sender, _purchaseAmount));
                 accounts[msg.sender].scheduledBalance += _purchaseAmount;
                 accounts[msg.sender].sourceBalance -= _purchaseAmount;
-                
-            } else {
+            } else { // handles remainder purchase amount
                 purchaseOrders[_nextUnixPurchaseDate].push(PurchaseOrder(msg.sender, accounts[msg.sender].sourceBalance));
                 accounts[msg.sender].scheduledBalance += accounts[msg.sender].sourceBalance;
                 accounts[msg.sender].sourceBalance -= accounts[msg.sender].sourceBalance;
@@ -173,6 +175,7 @@ contract Gravity is KeeperCompatibleInterface {
 
         // deposit sourceBalance into contract
         depositSource(_sourceAsset, _sourceBalance);
+        //depositAave();
         emit NewStrategy(msg.sender);
     }
 
@@ -193,7 +196,6 @@ contract Gravity is KeeperCompatibleInterface {
 
     // [test_timestamp] checkUpkeep
     function checkUpkeep(bytes calldata /* checkData */) external override returns (bool upkeepNeeded, bytes memory /* performData */) {
-        require(onOff == true, "Keeper checkUpkeep is off");
         if((block.timestamp - lastTimeStamp) > upKeepInterval) {
             uint _now = block.timestamp;
             uint _nextSlot = _now - (_now % upKeepInterval) + 2 * upKeepInterval;
@@ -206,28 +208,29 @@ contract Gravity is KeeperCompatibleInterface {
 
     // [test_timestamp] performUpkeep
     function performUpkeep(bytes calldata /* performData */) external override {
-        //revalidate the upkeep in the performUpkeep function
-        require(onOff == true, "Keeper checkUpkeep is off");
         uint _now = block.timestamp;
         uint _nextSlot = _now - (_now % upKeepInterval) + 2 * upKeepInterval;
         uint _toPurchase = accumulatePurchaseOrders(_nextSlot);
-        lastTimeStamp = block.timestamp;
-        if (_toPurchase > 0) {
+        // revalidate the upkeep in the performUpkeep function
+        if((block.timestamp - lastTimeStamp) > upKeepInterval) {
+            lastTimeStamp = block.timestamp;
+            if (_toPurchase > 0) {
 
-            uint256 _targetPurchased = swap(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa, 
-                                            0xd0A1E359811322d97991E03f863a0C30C2cF029C,
-                                            _toPurchase
-                                            ,0);
+                uint256 _targetPurchased = swap(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa, 
+                                                0xd0A1E359811322d97991E03f863a0C30C2cF029C,
+                                                _toPurchase,
+                                                0);
 
-            // update each account's scheduledBalance, targetBalance, and purchasesRemaining
-            for(uint i = 0; i < purchaseOrders[_nextSlot].length; i++) {
-                accounts[purchaseOrders[_nextSlot][i].user].scheduledBalance -= purchaseOrders[_nextSlot][i].purchaseAmount;
-                accounts[purchaseOrders[_nextSlot][i].user].purchasesRemaining -= 1;
-                accounts[purchaseOrders[_nextSlot][i].user].targetBalance += purchaseOrders[_nextSlot][i].purchaseAmount * (_targetPurchased * 10000) / _toPurchase; // stored as N * 10 ** 4
+                // update each account's scheduledBalance, targetBalance, and purchasesRemaining
+                for(uint i = 0; i < purchaseOrders[_nextSlot].length; i++) {
+                    accounts[purchaseOrders[_nextSlot][i].user].scheduledBalance -= purchaseOrders[_nextSlot][i].purchaseAmount;
+                    accounts[purchaseOrders[_nextSlot][i].user].purchasesRemaining -= 1;
+                    accounts[purchaseOrders[_nextSlot][i].user].targetBalance += purchaseOrders[_nextSlot][i].purchaseAmount * _targetPurchased / _toPurchase;
+                }
+                emit PurchaseExecuted(_nextSlot, _targetPurchased);
+            } else {
+                emit PerformUpkeepFailed(block.timestamp);
             }
-            emit PurchaseExecuted(_nextSlot, _targetPurchased);
-        } else {
-            emit PerformUpkeepFailed(block.timestamp);
         }
     }
 
@@ -245,12 +248,17 @@ contract Gravity is KeeperCompatibleInterface {
         uint[] memory purchaseAmounts = new uint[](_purchasesRemaining);
 
         // reconstruct strategy's deployment schedule
-        uint _unixNextTwoMinSlot = _accountStart - (_accountStart % 120) + 240;
-        uint _unixInterval = _interval * 120;
+        uint _unixNextTwoMinSlot = _accountStart - (_accountStart % upKeepInterval) + 2 * upKeepInterval;
+        uint _unixInterval = _interval * upKeepInterval;
         for(uint i = 1; i <= _purchasesRemaining; i++) {
             uint _nextUnixPurchaseDate = _unixNextTwoMinSlot + (_unixInterval * i);
             timestamps[i - 1] = _nextUnixPurchaseDate;
-            purchaseAmounts[i - 1] = (_scheduledBalance / _purchasesRemaining);
+            if(_scheduledBalance >= _purchaseAmount) {
+                purchaseAmounts[i - 1] = _purchaseAmount;
+                _scheduledBalance -= _purchaseAmount;
+            } else { // handles remainder purchase amount
+                purchaseAmounts[i - 1] = _scheduledBalance;
+            }
         }
         return(timestamps, purchaseAmounts);
     }
@@ -258,77 +266,77 @@ contract Gravity is KeeperCompatibleInterface {
     // TO DO: update to handle depositing into existing strategy
     // deposit into existing strategy (basic implementation for single source; would updating strategy)
     function depositSource(address _token, uint256 _amount) internal {
-        //require(sourceTokens[_token] == true, "Unsupported asset type");
+        require(sourceTokens[_token] == true, "Unsupported asset type");
         require(_amount > 0, "Insufficient value");
         (bool success) = IERC20(_token).transferFrom(msg.sender, address(this), _amount);
-        require(success, "Deposit unsuccessful: transferFrom");
+        require(success, "Deposit unsuccessful");
         emit Deposited(msg.sender, _amount);
     }
 
-    // TO DO: update to handle withdrawing from existing strategy
-    // TO do testing for partial withdrawal of LIVE strategy
-    function withdraw() external {
-        require(accounts[msg.sender].accountStart > 0, "Withdraw Address is Invalid");
-        require(!(accounts[msg.sender].withdrawFlag), "Account is withdrawn");
-
-        // Three scenarios for withdrawal
-        // 1. Withdraw if purchasesRemaining = 0, withdraw _targetBalance of type _targetAsset and transfer to user
-        // 2. Withdraw if no purchases were made, withdraw _sourceBalance of type _sourceAsset and transfer to user
-        // 3. Withdraw if partial purchases were made, withdraw _sourceBalance-totalinvestedAmount of type _sourceAsset 
-        //    and totalinvestedAmount of type _targetAsset to user
-
-        uint    _purchasesRemaining = accounts[msg.sender].purchasesRemaining;
-        address _sourceToken        = accounts[msg.sender].sourceAsset;
-        address _targetToken        = accounts[msg.sender].targetAsset;
-        uint    _sourceBalance      = accounts[msg.sender].sourceBalance;
-        uint    _targetBalance      = accounts[msg.sender].targetBalance;
-
-        accounts[msg.sender].withdrawFlag = true;
-        bool success;
-
-        if (_targetBalance == 0){
-            require(_sourceBalance > 0,"For zero investment, _sourceBalance is zero");
-            
-            if(IERC20(_sourceToken).balanceOf(address(this)) < _sourceBalance){
-                // TO DO: if treasury do not have enough source asset token, make call to Aave for retrieval
-            }
-
-            (success) = IERC20(_sourceToken).transfer(msg.sender, _sourceBalance);
-            require(success, "Withdraw from source asset unsuccessful");
-            emit Withdrawn(msg.sender, _sourceBalance);
-        }
-        else if(_purchasesRemaining == 0){
-            require(_targetBalance > 0,"Insufficient source asset balance");
-
-            if(IERC20(_targetToken).balanceOf(address(this)) < _targetBalance){
-                // TO DO: if treasury do not have enough target asset token, make call to Aave for retrieval
-            }
-
-            (success) = IERC20(_targetToken).transfer(msg.sender, _targetBalance);
-            require(success, "Withdraw from target asset unsuccessful");
-            emit Withdrawn(msg.sender, _sourceBalance);
-        }
-        else{
-            require(_sourceBalance > 0,"Insufficient source asset balance for partial withdrawal");
-            require(_targetBalance > 0,"Insufficient target asset balance for partial withdrawal");
-
-            if(IERC20(_targetToken).balanceOf(address(this)) < _targetBalance){
-                // TO DO: if treasury do not have enough target asset token, make call to AAVE for retrieval
-            }
-
-            if(IERC20(_sourceToken).balanceOf(address(this)) < _sourceBalance){
-              // TO DO: if treasury do not have enough source asset token, make call to AAVE for retrieval
-            }
-
-            (success) = IERC20(_sourceToken).transfer(msg.sender, _sourceBalance);
-            require(success, "Withdraw from source asset unsuccessful");
-            emit Withdrawn(msg.sender, _sourceBalance);
-            (success) = IERC20(_targetToken).transfer(msg.sender, _targetBalance);
-            require(success, "Withdraw from target asset unsuccessful");
-            emit Withdrawn(msg.sender, _sourceBalance);
-        }
+    // constant time delete function [withdrawSource helper]
+    function removePurchaseOrder(uint _timestamp, uint _purchaseOrderIndex) internal {
+        require(purchaseOrders[_timestamp].length > _purchaseOrderIndex, "Purchase order index out of range");
+        purchaseOrders[_timestamp][_purchaseOrderIndex] = purchaseOrders[_timestamp][purchaseOrders[_timestamp].length - 1];
+        purchaseOrders[_timestamp].pop();
     }
 
+    function withdrawSource(address _token, uint256 _amount) external {
+        require(sourceTokens[_token] == true, "Unsupported asset type");
+        require(accounts[msg.sender].scheduledBalance > _amount);
+        (uint[] memory timestamps, uint[] memory purchaseAmounts) = reconstructSchedule(msg.sender);
+
+        // remove purchase orders starting at the end of strategy's schedule
+        uint256 _accumulate;
+        uint i = timestamps.length - 1;
+        // loop over account's remaining timestamps in reverse order
+        while(_amount >= _accumulate) {
+            // loop over PurchaseOrder array, compare account's withdrawal amount against purchaseAmount
+            for(uint k = 0; k < purchaseOrders[timestamps[i]].length; k++) {
+                if(purchaseOrders[timestamps[i]][k].user == msg.sender) {
+
+                    // case 1: withdrawal amount equals purchase amount + accumulated balance (PO is removed)
+                    if(purchaseOrders[timestamps[i]][k].purchaseAmount + _accumulate == _amount) {
+                        _accumulate = _amount;
+                        accounts[msg.sender].purchasesRemaining -= 1;
+                        removePurchaseOrder(timestamps[i], k); // remove PO from array
+
+                    // case 2: withdrawal amount is less than purchase amount + accumulated balance (PO remains in place)
+                    } else if(purchaseOrders[timestamps[i]][k].purchaseAmount + _accumulate > _amount) {
+                        // reduce purchase amount by difference
+                        purchaseOrders[timestamps[i]][k].purchaseAmount -= (_amount - _accumulate);
+                        _accumulate = _amount;
+
+                    // case 3: withdrawal amount exceeds purchase amount + accumulated balance (PO is removed, keep iterating)
+                    } else {
+                        _accumulate += purchaseOrders[timestamps[i]][k].purchaseAmount;
+                        accounts[msg.sender].purchasesRemaining -= 1;
+                        // remove PO from array
+                        removePurchaseOrder(timestamps[i], k);
+                    }
+                     // break inner loop
+                    k = purchaseOrders[timestamps[i]].length;
+                }
+            }
+            i--;
+        }
+
+        // reduce scheduledBalance by _amount
+        accounts[msg.sender].scheduledBalance -= _amount;
+        (bool success) = IERC20(_token).transfer(msg.sender, _amount);
+        require(success, "Withdrawal unsuccessful");
+        emit WithdrawnSource(msg.sender, _amount);
+    }
+
+
+    function withdrawTarget(address _token, uint256 _amount) external {
+        require(targetTokens[_token] == true, "Unsupported asset type");
+        require(accounts[msg.sender].targetBalance >= _amount);
+        accounts[msg.sender].targetBalance -= _amount;
+        (bool success) = IERC20(_token).transfer(msg.sender, _amount);
+        require(success, "Withdrawal unsuccessful");
+        emit WithdrawnTarget(msg.sender, _amount);
+    }
+    
     // [testing] temporary function to extract tokens
     function empty() public {
         require(msg.sender == owner);

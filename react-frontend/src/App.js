@@ -26,8 +26,12 @@ function App() {
   const [withdrawAsset, setWithdrawAsset] = React.useState("");
   const [withdrawAmount, setWithdrawAmount] = React.useState("");
 
-  // State variables for user orders and order details.
+  // State variables for user account details
   const [ordersCount, setOrdersCount] = React.useState("");
+  const [srcAsset, setSrcAsset] = React.useState("");
+  const [srcAssetBal, setSrcAssetBal] = React.useState("");
+  const [tgtAsset, setTgtAsset] = React.useState("");
+  const [tgtAssetBal, setTgtAssetBal] = React.useState("");
 
   const { ethereum } = window;
   let provider;
@@ -36,6 +40,11 @@ function App() {
   tokenAddresses['DAI'] = DAI_KOVAN;
   tokenAddresses['ETH'] = WETH_KOVAN;
   tokenAddresses['LINK'] = LINK_KOVAN;
+
+  const tokenAddressesRev = {};
+  tokenAddressesRev[DAI_KOVAN] = 'DAI';
+  tokenAddressesRev[WETH_KOVAN] = 'ETH';
+  tokenAddressesRev[LINK_KOVAN] = 'LINK';
 
   const contractJSONs = {};
   contractJSONs['DAI'] = daiJSON;
@@ -57,35 +66,44 @@ function App() {
     setAddress(userAddress);
     setBalance(ethers.utils.formatEther(userBalance));
 
-    //
     const daiContract = new ethers.Contract(DAI_KOVAN, daiJSON, signer);
     const userDaiBalance = await daiContract.balanceOf(userAddress);
-    //console.log("DAI BALANCE: ", userDaiBalance);
     setDaiBalance(ethers.utils.formatEther(userDaiBalance));
-    //
+
     const linkContract = new ethers.Contract(LINK_KOVAN, linkJSON, signer);
     const userLinkBalance = await linkContract.balanceOf(userAddress);
-    //console.log("LINK BALANCE: ", userLinkBalance);
     setLinkBalance(ethers.utils.formatEther(userLinkBalance));
 
+    const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
+    // Accounts
+
+    //const strAddress = userAddress.toString();
+   //const accountsList = await contractInstance.accounts(userAddress.toString()); //'0xa1d8f7707D088b92B22e70b9932eD49C4473e6B6'); //signer.address);
+    //const formatted = ethers.utils.formatEther(accountsList)
+    //console.log(formatted);
+    //console.log(accountsList);
+
+    const userAccount = await contractInstance.accounts(userAddress);
+    console.log(userAccount);
+
+    const srcAsset = userAccount[1]
+    setSrcAsset(tokenAddressesRev[srcAsset]);
+    const srcAssetBal = ethers.utils.formatEther(userAccount[3]); // not sure this is the right index
+    setSrcAssetBal(srcAssetBal);
+    const tgtAsset = userAccount[2]
+    setTgtAsset(tokenAddressesRev[tgtAsset]);
+    const tgtAssetBal = ethers.utils.formatEther(userAccount[5]);
+    setTgtAssetBal(tgtAssetBal);
 
     // Display puchase orders
-
-    const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
+    //const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
     const purchaseOrders = await contractInstance.purchaseOrders;
     const poCount = purchaseOrders.length;
     //console.log("PURCHASE ORDERS: ", purchaseOrders);
     console.log(poCount);
     setOrdersCount(poCount);
-    //
-    // for(let i=0; i<poCount; i++) {
-    //  console.log(purchaseOrders[i]);
-    // }
 
-    // Accounts
-    const accountsList = await contractInstance.accounts;
-    console.log(accountsList);
-    console.log(accountsList.length);
+
   }
 
   async function initiateNewStrategy() {
@@ -97,8 +115,6 @@ function App() {
     console.log("approve: ", approve);
 
     const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
-
-
     const initStrategy = await contractInstance.initiateNewStrategy(tokenAddresses[depositAsset], 
                                                                     tokenAddresses['ETH'], 
                                                                     depositAmount,
@@ -108,6 +124,13 @@ function App() {
     console.log("initiateNewStrategy: ", initStrategy);
     console.log("source asset address:", tokenAddresses[depositAsset]);
   }
+
+  // async function getTargetAssetBalance() {
+  //   const signer = await provider.getSigner();
+  //   const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
+  //   const targetAssetBalance = await contractInstance.accounts(signer.address).targetBalance;
+  //   setTargetAssetBalance(ethers.utils.formatEther(targetAssetBalance));
+  // }
 
   async function withdraw() {
     const signer = await provider.getSigner();
@@ -185,11 +208,22 @@ function App() {
           </div>
         </div>
       </div>
-
       <div className="container">
         <div className="user-strategies">
-          <h3>My Strategies</h3>
+          <h3>Open Strategy</h3>
           <ul>
+            <li>
+              Source Asset: {srcAsset}
+            </li>
+            <li>
+              Source Asset Balance: {srcAssetBal}
+            </li>
+            <li>
+              Target Asset: {tgtAsset}
+            </li>
+            <li>
+              Target Asset Balance: {tgtAssetBal}
+            </li>
             <li>
               Open Orders: {ordersCount}
             </li>
