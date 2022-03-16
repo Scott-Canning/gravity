@@ -18,7 +18,7 @@ async function main() {
 
   // launch DepositWithdraw contract
   const Contract = await ethers.getContractFactory("Gravity");
-  const contract = await Contract.deploy(sourceToken.address, targetToken.address); // pass in test sourceToken address as supported source sourceToken
+  const contract = await Contract.deploy(sourceToken.address, targetToken.address, 120); // pass in test sourceToken address as supported source sourceToken
   await contract.deployed();
   console.log('Contract deployed to address: ', contract.address);
   console.log("\n");
@@ -47,15 +47,15 @@ async function main() {
   console.log("\n");
   
   // signer 1 approves and allowance for the Contract to take the deposit
-  const approve = await sourceToken.approve(contract.address, 1000);
+  const approve = await sourceToken.approve(contract.address, 22000);
   //const approve = await contract.approveDeposit(sourceToken.address, 11);
   //console.log('Approve: ', approve);
 
   const initNewStrat = await contract.initiateNewStrategy(sourceToken.address,
                                                           targetToken.address,
-                                                          1000,
+                                                          22000,
                                                           1,
-                                                          100);
+                                                          5000);
   console.log("Initiate new strategy (Signer1): ", initNewStrat);
 
   /*
