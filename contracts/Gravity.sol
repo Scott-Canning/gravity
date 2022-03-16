@@ -13,12 +13,8 @@ contract Gravity is KeeperCompatibleInterface {
     uint public immutable upKeepInterval;
     uint public lastTimeStamp;
 
-    ISwapRouter public immutable swapRouter = 
-    ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);  // Uniswap V3
-    uint24 public constant poolFee = 3000;                      // For this example, we will set the pool fee to 0.3%.
-    
-    
-   // address private constant WETH = 0xd0A1E359811322d97991E03f863a0C30C2cF029C;
+    uint24 public constant poolFee = 3000;                      // pool fee set to 0.3%
+    ISwapRouter public immutable swapRouter = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);  // UniswapV3
 
     mapping (address => Account) public accounts;               // user address => user Account
     mapping (address => bool) public sourceTokens;              // mapping for supported tokens
@@ -26,9 +22,9 @@ contract Gravity is KeeperCompatibleInterface {
     mapping (uint => PurchaseOrder[]) public purchaseOrders;
 
     event NewStrategy(address);
-    event PurchaseExecuted(uint256);                            // testing
-    event PerformUpkeepFailed(uint256);                         // testing
-    event Deposited(address, uint256);
+    event PurchaseExecuted(uint timestamp, uint targetPurchased);
+    event PerformUpkeepFailed(uint timestamp);
+    event Deposited(address, uint256 sourceDeposit);
     event Withdrawn(address, uint256);
 
     struct Account {
@@ -69,9 +65,9 @@ contract Gravity is KeeperCompatibleInterface {
         // sourceTokens[address(0xa36085F69e2889c224210F603D836748e7dC0088)] = true; // LINK
     }
 
-    function swap(address _tokenIn, address _tokenOut, uint256 amountIn, uint256 _amountOutMin) internal returns (uint256 amountOut) {
-        // Approve the router to spend DAI.
-        TransferHelper.safeApprove(_tokenIn, address(swapRouter), amountIn);
+    function swap(address _tokenIn, address _tokenOut, uint256 _amountIn, uint256 _amountOutMin) internal returns (uint256 amountOut) {
+        // approve the router to spend DAI.
+        TransferHelper.safeApprove(_tokenIn, address(swapRouter), _amountIn);
 
         // Naively set amountOutMinimum to 0. In production, use an oracle or other data source to choose a safer value for amountOutMinimum.
         // We also set the sqrtPriceLimitx96 to be 0 to ensure we swap our exact input amount.
@@ -82,7 +78,7 @@ contract Gravity is KeeperCompatibleInterface {
                 fee: poolFee,
                 recipient: address(this),
                 deadline: block.timestamp,
-                amountIn: amountIn,
+                amountIn: _amountIn,
                 amountOutMinimum: _amountOutMin,
                 sqrtPriceLimitX96: 0
             });
@@ -138,8 +134,15 @@ contract Gravity is KeeperCompatibleInterface {
         require(targetTokens[_targetAsset] == true, "Unsupported target asset type");
         require(_sourceBalance > 0, "Insufficient deposit amount");
         require(_interval == 1 || _interval == 7 || _interval == 14 || _interval == 21 || _interval == 30, "Unsupported interval");
+        
         uint _accountStart = block.timestamp;
         uint _purchasesRemaining = _sourceBalance / _purchaseAmount;
+        
+        // handle remainder purchaseAmounts
+        if((_sourceBalance % _purchaseAmount) > 0) {
+            _purchasesRemaining = _purchasesRemaining + 1;
+        }
+
         accounts[msg.sender] = Account(_accountStart, 
                                        _sourceAsset, 
                                        _targetAsset, 
@@ -152,18 +155,23 @@ contract Gravity is KeeperCompatibleInterface {
                                        false);
 
         // populate purchaseOrders mapping
-        uint _unixNextSlot = _accountStart - (_accountStart % upKeepInterval) + 2*upKeepInterval;
+        uint _unixNextSlot = _accountStart - (_accountStart % upKeepInterval) + 2 * upKeepInterval;
         uint _unixInterval = _interval * upKeepInterval;
         for(uint i = 1; i <= _purchasesRemaining; i++) {
             uint _nextUnixPurchaseDate = _unixNextSlot + (_unixInterval * i);
-            // TO DO: add check on sufficient sourceBalance, (sourceBalance - scheduledBalance) > purchaseAmount
-            // else, deployment remaining amount (i.e., handle non-even deposits)
-            purchaseOrders[_nextUnixPurchaseDate].push(PurchaseOrder(msg.sender, _purchaseAmount));
-            accounts[msg.sender].scheduledBalance += _purchaseAmount;
-            //accounts[msg.sender].sourceBalance -= _purchaseAmount;
+            if(accounts[msg.sender].sourceBalance > accounts[msg.sender].purchaseAmount) {
+                purchaseOrders[_nextUnixPurchaseDate].push(PurchaseOrder(msg.sender, _purchaseAmount));
+                accounts[msg.sender].scheduledBalance += _purchaseAmount;
+                accounts[msg.sender].sourceBalance -= _purchaseAmount;
+                
+            } else {
+                purchaseOrders[_nextUnixPurchaseDate].push(PurchaseOrder(msg.sender, accounts[msg.sender].sourceBalance));
+                accounts[msg.sender].scheduledBalance += accounts[msg.sender].sourceBalance;
+                accounts[msg.sender].sourceBalance -= accounts[msg.sender].sourceBalance;
+            }
         }
 
-        // Call depositSource to move account holders sourcebalance to Gravity contract
+        // deposit sourceBalance into contract
         depositSource(_sourceAsset, _sourceBalance);
         emit NewStrategy(msg.sender);
     }
@@ -187,10 +195,10 @@ contract Gravity is KeeperCompatibleInterface {
     function checkUpkeep(bytes calldata /* checkData */) external override returns (bool upkeepNeeded, bytes memory /* performData */) {
         require(onOff == true, "Keeper checkUpkeep is off");
         if((block.timestamp - lastTimeStamp) > upKeepInterval) {
-            uint256 _now = block.timestamp;
-            uint256 _nextSlot = _now - (_now % upKeepInterval) + 2*upKeepInterval;
-            uint _total = accumulatePurchaseOrders(_nextSlot);
-            if(_total > 0) {
+            uint _now = block.timestamp;
+            uint _nextSlot = _now - (_now % upKeepInterval) + 2 * upKeepInterval;
+            uint _toPurchase = accumulatePurchaseOrders(_nextSlot);
+            if(_toPurchase > 0) {
                 upkeepNeeded = true;
             }
         }
@@ -200,18 +208,24 @@ contract Gravity is KeeperCompatibleInterface {
     function performUpkeep(bytes calldata /* performData */) external override {
         //revalidate the upkeep in the performUpkeep function
         require(onOff == true, "Keeper checkUpkeep is off");
-        uint256 _now = block.timestamp;
-        uint256 _nextSlot = _now - (_now % upKeepInterval) + 2*upKeepInterval;
-        uint _total = accumulatePurchaseOrders(_nextSlot);
+        uint _now = block.timestamp;
+        uint _nextSlot = _now - (_now % upKeepInterval) + 2 * upKeepInterval;
+        uint _toPurchase = accumulatePurchaseOrders(_nextSlot);
         lastTimeStamp = block.timestamp;
-        if (_total > 0) {
+        if (_toPurchase > 0) {
 
-           uint amountOut = swap(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa, 
-                                0xd0A1E359811322d97991E03f863a0C30C2cF029C,
-                                _total
-                                ,0);
+            uint256 _targetPurchased = swap(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa, 
+                                            0xd0A1E359811322d97991E03f863a0C30C2cF029C,
+                                            _toPurchase
+                                            ,0);
 
-            emit PurchaseExecuted(_nextSlot);
+            // update each account's scheduledBalance, targetBalance, and purchasesRemaining
+            for(uint i = 0; i < purchaseOrders[_nextSlot].length; i++) {
+                accounts[purchaseOrders[_nextSlot][i].user].scheduledBalance -= purchaseOrders[_nextSlot][i].purchaseAmount;
+                accounts[purchaseOrders[_nextSlot][i].user].purchasesRemaining -= 1;
+                accounts[purchaseOrders[_nextSlot][i].user].targetBalance += purchaseOrders[_nextSlot][i].purchaseAmount * (_targetPurchased * 10000) / _toPurchase; // stored as N * 10 ** 4
+            }
+            emit PurchaseExecuted(_nextSlot, _targetPurchased);
         } else {
             emit PerformUpkeepFailed(block.timestamp);
         }
@@ -268,7 +282,6 @@ contract Gravity is KeeperCompatibleInterface {
         address _targetToken        = accounts[msg.sender].targetAsset;
         uint    _sourceBalance      = accounts[msg.sender].sourceBalance;
         uint    _targetBalance      = accounts[msg.sender].targetBalance;
-
 
         accounts[msg.sender].withdrawFlag = true;
         bool success;
