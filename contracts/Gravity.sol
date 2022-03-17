@@ -7,6 +7,14 @@ import "@chainlink/contracts/src/v0.8/KeeperCompatible.sol";
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 
+interface CErc20 {
+    function mint(uint256) external returns (uint256);
+    function exchangeRateCurrent() external returns (uint256);
+    function supplyRatePerBlock() external returns (uint256);
+    function redeem(uint) external returns (uint);
+    function redeemUnderlying(uint) external returns (uint);
+}
+
 contract Gravity is KeeperCompatibleInterface {
     address payable owner;
     bool public onOff = true;                                   // [testing] toggle Keeper on/off
@@ -16,6 +24,7 @@ contract Gravity is KeeperCompatibleInterface {
     uint24 public constant poolFee = 3000;                      // pool fee set to 0.3%
     ISwapRouter public immutable swapRouter = 
     ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);    // UniswapV3
+    uint public amountLent;                                     // DAI lent on Compound
 
     mapping (address => Account) public accounts;               // user address => user Account
     mapping (address => bool) public sourceTokens;              // mapping for supported tokens
@@ -28,6 +37,8 @@ contract Gravity is KeeperCompatibleInterface {
     event Deposited(address from, uint256 sourceDeposited);
     event WithdrawnTarget(address to, uint256 targetWithdrawn);
     event WithdrawnSource(address to, uint256 sourceWithdrawn);
+    event LentDAI(uint256 exchangeRate, uint256 supplyRate);
+    event RedeemedDAI(uint256 redeemResult);
 
     struct Account {
         uint            accountStart;
@@ -68,10 +79,10 @@ contract Gravity is KeeperCompatibleInterface {
     }
 
     function swap(address _tokenIn, address _tokenOut, uint256 _amountIn, uint256 _amountOutMin) internal returns (uint256 amountOut) {
-        // approve the router to spend DAI.
+        // approve router to spend tokenIn
         TransferHelper.safeApprove(_tokenIn, address(swapRouter), _amountIn);
 
-        // Naively set amountOutMinimum to 0. In production, use an oracle or other data source to choose a safer value for amountOutMinimum.
+        // naively set amountOutMinimum to 0. In production, use an oracle or other data source to choose a safer value for amountOutMinimum.
         // We also set the sqrtPriceLimitx96 to be 0 to ensure we swap our exact input amount.
         ISwapRouter.ExactInputSingleParams memory params =
             ISwapRouter.ExactInputSingleParams({
@@ -85,11 +96,50 @@ contract Gravity is KeeperCompatibleInterface {
                 sqrtPriceLimitX96: 0
             });
 
-        // The call to `exactInputSingle` executes the swap.
+        // call to `exactInputSingle` executes the swap.
         amountOut = swapRouter.exactInputSingle(params);
     }
     
-    // [test_timestamp] accumulatePurchaseOrders
+    function lendCompound(address _tokenIn, uint256 _lendAmount) internal returns (uint) {
+        require(IERC20(_tokenIn).balanceOf(address(this) > _lendAmount));
+
+        // create a reference to the corresponding cToken contract, like cDAI
+        CErc20 cToken = CErc20(0xF0d0EB522cfa50B716B3b1604C4F0fA6f04376AD);
+
+        // amount of current exchange rate from cToken to underlying
+        uint256 exchangeRate = cToken.exchangeRateCurrent();
+
+        // amount added to you supply balance this block
+        uint256 supplyRate = cToken.supplyRatePerBlock();
+
+        // approve transfer on the ERC20 contract
+        IERC20(_tokenIn).approve(0xF0d0EB522cfa50B716B3b1604C4F0fA6f04376AD, _lendAmount);
+
+        amountLent += _lendAmount;
+
+        // mint cTokens
+        uint mintResult = cToken.mint(_lendAmount);
+        emit LentDAI(exchangeRate, supplyRate);
+        return mintResult;
+    }
+
+    function redeemCompound(uint256 _redeemAmount) internal returns (uint) { 
+        require(_redeemAmount < amountLent, "Redemption amount exceeds lent amount");
+        CErc20 cToken = CErc20(0xF0d0EB522cfa50B716B3b1604C4F0fA6f04376AD);
+    
+        // retrieve asset based on an amount of the asset
+        uint256 redeemResult;
+
+        amountLent -= _redeemAmount;
+        
+        // redeem underlying
+        redeemResult = cToken.redeemUnderlying(_redeemAmount);
+        emit RedeemedDAI(redeemResult);
+        return true;
+    }
+
+
+    // [accelerated demo version]
     function accumulatePurchaseOrders(uint _timestamp) public view returns (uint) {
         uint _total;
         for(uint i = 0; i < purchaseOrders[_timestamp].length; i++) {
@@ -98,40 +148,9 @@ contract Gravity is KeeperCompatibleInterface {
         return _total;
     }
 
-    // [production] initiateNewStrategy
-    // function initiateNewStrategy(address _sourceAsset, address _targetAsset, uint _sourceBalance, uint _interval, uint _purchaseAmount) public {
-    //     require(sourceTokens[_sourceAsset] == true, "Unsupported source asset type");
-    //     require(targetTokens[_targetAsset] == true, "Unsupported target asset type");
-    //     require(_sourceBalance > 0, "Insufficient deposit amount");
-    //     require(_interval == 1 || _interval == 7 || _interval == 14 || _interval == 21 || _interval == 30, "Unsupported interval");
-    //     uint _accountStart = block.timestamp;
-    //     uint _purchasesRemaining = _sourceBalance / _purchaseAmount;
-    //     accounts[msg.sender] = Account(_accountStart, 
-    //                                    _sourceAsset, 
-    //                                    _targetAsset, 
-    //                                    _sourceBalance, 
-    //                                    0, 
-    //                                    0, 
-    //                                    _interval, 
-    //                                    _purchaseAmount, 
-    //                                    _purchasesRemaining);
-
-    //     // populate purchaseOrders mapping
-    //     uint _unixNoonToday = _accountStart - (_accountStart % 86400) + 86400 + 43200;
-    //     uint _unixInterval = _interval * 86400;
-    //     for(uint i = 1; i <= _purchasesRemaining; i++) {
-    //         uint _nextUnixPurchaseDate = _unixNoonToday + (_unixInterval * i);
-    //         purchaseOrders[_nextUnixPurchaseDate].push(PurchaseOrder(msg.sender, _purchaseAmount));
-    //     }
-
-    //     // transfer user balance to contract
-    //     (bool success) = IERC20(_sourceAsset).transferFrom(msg.sender, address(this), _sourceBalance);
-    //     require(success, "Initiate new strategy unsuccessful");
-    //     emit NewStrategy(msg.sender);
-    // }
-
-    // [test_timestamp] initiateNewStrategy
+    // [accelerated demo version]
     function initiateNewStrategy(address _sourceAsset, address _targetAsset, uint _sourceBalance, uint _interval, uint _purchaseAmount) public {
+        require(accounts[msg.sender].purchasesRemaining == 0, "Account has existing strategy");
         require(sourceTokens[_sourceAsset] == true, "Unsupported source asset type");
         require(targetTokens[_targetAsset] == true, "Unsupported target asset type");
         require(_sourceBalance > 0, "Insufficient deposit amount");
@@ -180,26 +199,11 @@ contract Gravity is KeeperCompatibleInterface {
 
         // deposit sourceBalance into contract
         depositSource(_sourceAsset, _sourceBalance);
-        //depositAave();
+        // depositAave();
         emit NewStrategy(msg.sender);
     }
 
-    // [production] checkUpkeep
-    // function checkUpkeep(bytes calldata /* checkData */) external override returns (bool upkeepNeeded, bytes memory /* performData */) {
-    //     require(onOff == true, "Keeper checkUpkeep is off");
-    //     uint _now = block.timestamp;
-    //     uint _unixNoonToday = _now - (_now % 86400) + 43200;
-    //     // if timestamp > noon
-    //     if(block.timestamp > _unixNoonToday) {
-    //         // if total PO > 0
-    //         uint _total = accumulatePurchaseOrders();
-    //         if(_total > 0) {
-    //             upkeepNeeded = true;
-    //         }
-    //     }
-    // }
-
-    // [test_timestamp] checkUpkeep
+    // [accelerated demo version]
     function checkUpkeep(bytes calldata /* checkData */) external override returns (bool upkeepNeeded, bytes memory /* performData */) {
         if((block.timestamp - lastTimeStamp) > upKeepInterval) {
             uint _now = block.timestamp;
@@ -211,12 +215,12 @@ contract Gravity is KeeperCompatibleInterface {
         }
     }
 
-    // [test_timestamp] performUpkeep
+    // [accelerated demo version]
     function performUpkeep(bytes calldata /* performData */) external override {
         uint _now = block.timestamp;
         uint _nextSlot = _now - (_now % upKeepInterval) + 2 * upKeepInterval;
         uint _toPurchase = accumulatePurchaseOrders(_nextSlot);
-        // revalidate the upkeep in the performUpkeep function
+        // revalidate checkUpkeep condition
         if((block.timestamp - lastTimeStamp) > upKeepInterval) {
             lastTimeStamp = block.timestamp;
             if (_toPurchase > 0) {
@@ -232,10 +236,8 @@ contract Gravity is KeeperCompatibleInterface {
                     accounts[purchaseOrders[_nextSlot][i].user].purchasesRemaining -= 1;
                     accounts[purchaseOrders[_nextSlot][i].user].targetBalance += purchaseOrders[_nextSlot][i].purchaseAmount * _targetPurchased / _toPurchase;
                 }
-
-                // delete purchaseOrder
+                // delete purchaseOrder post swap
                 delete purchaseOrders[_nextSlot];
-
                 emit PurchaseExecuted(_nextSlot, _targetPurchased);
             } else {
                 emit PerformUpkeepFailed(block.timestamp);
@@ -243,7 +245,7 @@ contract Gravity is KeeperCompatibleInterface {
         }
     }
 
-    // reconstruct deployment schedule of account's strategy; naive implementation (works for un-executed strategies)
+    // reconstruct accounts deployment schedule
     function reconstructSchedule(address _account) public view returns (uint256[] memory, uint256[] memory) {
         // get account data
         uint _accountStart = accounts[_account].accountStart;
@@ -272,8 +274,7 @@ contract Gravity is KeeperCompatibleInterface {
         return(timestamps, purchaseAmounts);
     }
 
-    // TO DO: update to handle depositing into existing strategy
-    // deposit into existing strategy (basic implementation for single source; would updating strategy)
+    // [initiateNewStrategy helper] does not handle depositing into existing strategies
     function depositSource(address _token, uint256 _amount) internal {
         require(sourceTokens[_token] == true, "Unsupported asset type");
         require(_amount > 0, "Insufficient value");
@@ -282,13 +283,14 @@ contract Gravity is KeeperCompatibleInterface {
         emit Deposited(msg.sender, _amount);
     }
 
-    // constant time delete function [withdrawSource helper]
+    // [withdrawSource helper] constant time delete function 
     function removePurchaseOrder(uint _timestamp, uint _purchaseOrderIndex) internal {
         require(purchaseOrders[_timestamp].length > _purchaseOrderIndex, "Purchase order index out of range");
         purchaseOrders[_timestamp][_purchaseOrderIndex] = purchaseOrders[_timestamp][purchaseOrders[_timestamp].length - 1];
         purchaseOrders[_timestamp].pop(); // implicit delete
     }
 
+    // withdraw source token
     function withdrawSource(address _token, uint256 _amount) external {
         require(sourceTokens[_token] == true, "Unsupported asset type");
         require(accounts[msg.sender].scheduledBalance >= _amount, "Scheduled balance insufficient");
@@ -330,7 +332,7 @@ contract Gravity is KeeperCompatibleInterface {
         emit WithdrawnSource(msg.sender, _amount);
     }
 
-
+    // withdraw target token
     function withdrawTarget(address _token, uint256 _amount) external {
         require(targetTokens[_token] == true, "Unsupported asset type");
         require(accounts[msg.sender].targetBalance >= _amount);
