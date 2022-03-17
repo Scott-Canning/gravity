@@ -101,7 +101,8 @@ contract Gravity is KeeperCompatibleInterface {
     }
     
     function lendCompound(address _tokenIn, uint256 _lendAmount) internal returns (uint) {
-        require(IERC20(_tokenIn).balanceOf(address(this) > _lendAmount));
+        // this require is likely failing if deposit assets arent settled yet
+        // require(IERC20(_tokenIn).balanceOf(address(this)) > _lendAmount, "Insufficient balance to lend");
 
         // create a reference to the corresponding cToken contract, like cDAI
         CErc20 cToken = CErc20(0xF0d0EB522cfa50B716B3b1604C4F0fA6f04376AD);
@@ -123,7 +124,7 @@ contract Gravity is KeeperCompatibleInterface {
         return mintResult;
     }
 
-    function redeemCompound(uint256 _redeemAmount) internal returns (uint) { 
+    function redeemCompound(uint256 _redeemAmount) internal returns (bool) { 
         require(_redeemAmount < amountLent, "Redemption amount exceeds lent amount");
         CErc20 cToken = CErc20(0xF0d0EB522cfa50B716B3b1604C4F0fA6f04376AD);
     
@@ -131,13 +132,12 @@ contract Gravity is KeeperCompatibleInterface {
         uint256 redeemResult;
 
         amountLent -= _redeemAmount;
-        
+
         // redeem underlying
         redeemResult = cToken.redeemUnderlying(_redeemAmount);
         emit RedeemedDAI(redeemResult);
         return true;
     }
-
 
     // [accelerated demo version]
     function accumulatePurchaseOrders(uint _timestamp) public view returns (uint) {
@@ -198,8 +198,12 @@ contract Gravity is KeeperCompatibleInterface {
         }
 
         // deposit sourceBalance into contract
+        // depositSource(_sourceAsset, _sourceBalance);
+
+        // [testing] compound lend
         depositSource(_sourceAsset, _sourceBalance);
-        // depositAave();
+        uint _splitBalance = _sourceBalance / 2;
+        lendCompound(_sourceAsset, _splitBalance);
         emit NewStrategy(msg.sender);
     }
 
@@ -224,6 +228,11 @@ contract Gravity is KeeperCompatibleInterface {
         if((block.timestamp - lastTimeStamp) > upKeepInterval) {
             lastTimeStamp = block.timestamp;
             if (_toPurchase > 0) {
+
+                // [testing] compound redeem
+                if(_toPurchase > IERC20(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa).balanceOf(address(this))) {
+                    redeemCompound(_toPurchase - IERC20(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa).balanceOf(address(this)));
+                }
 
                 uint256 _targetPurchased = swap(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa, 
                                                 0xd0A1E359811322d97991E03f863a0C30C2cF029C,
