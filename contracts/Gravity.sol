@@ -286,44 +286,37 @@ contract Gravity is KeeperCompatibleInterface {
     function removePurchaseOrder(uint _timestamp, uint _purchaseOrderIndex) internal {
         require(purchaseOrders[_timestamp].length > _purchaseOrderIndex, "Purchase order index out of range");
         purchaseOrders[_timestamp][_purchaseOrderIndex] = purchaseOrders[_timestamp][purchaseOrders[_timestamp].length - 1];
-        purchaseOrders[_timestamp].pop(); // implicitly calls delete on the removed element (v0.8.13)
+        purchaseOrders[_timestamp].pop(); // implicit delete
     }
 
     function withdrawSource(address _token, uint256 _amount) external {
         require(sourceTokens[_token] == true, "Unsupported asset type");
         require(accounts[msg.sender].scheduledBalance >= _amount, "Scheduled balance insufficient");
         (uint[] memory timestamps, uint[] memory purchaseAmounts) = reconstructSchedule(msg.sender);
-
-        // remove purchase orders in reverse order
         uint256 _accumulate;
-        uint i = timestamps.length - 1;
+        uint256 i = timestamps.length - 1;
+        // remove purchase orders in reverse order, comparing withdrawal amount with purchaseAmount
         while(_amount > _accumulate) {
-            // loop over PurchaseOrder array, compare account's withdrawal amount against purchaseAmount
             for(uint k = 0; k < purchaseOrders[timestamps[i]].length; k++) {
                 if(purchaseOrders[timestamps[i]][k].user == msg.sender) {
-
-                    // case 1: withdrawal amount equals purchase amount + accumulated balance (PO is removed)
+                    // case 1: amount equals (purchase amount + accumulated balance), PO is removed
                     if(purchaseOrders[timestamps[i]][k].purchaseAmount + _accumulate == _amount) {
                         _accumulate = _amount;
                         accounts[msg.sender].purchasesRemaining -= 1;
-                        // update purchaseOrders
-                        removePurchaseOrder(timestamps[i], k); // remove PO from array
-
-                    // case 2: withdrawal amount is less than purchase amount + accumulated balance (PO remains in place)
+                        // remove PO from array
+                        removePurchaseOrder(timestamps[i], k); 
+                    // case 2: amount less than (purchase amount + accumulated balance), PO is reduced
                     } else if(purchaseOrders[timestamps[i]][k].purchaseAmount + _accumulate > _amount) {
                         // reduce purchase amount by difference
                         purchaseOrders[timestamps[i]][k].purchaseAmount -= (_amount - _accumulate);
                         _accumulate = _amount;
-
-                    // case 3: withdrawal amount exceeds purchase amount + accumulated balance (PO is removed, keep iterating)
+                    // case 3: amount exceeds (purchase amount + accumulated balance), PO is removed, continue accumulating
                     } else {
                         _accumulate += purchaseOrders[timestamps[i]][k].purchaseAmount;
                         accounts[msg.sender].purchasesRemaining -= 1;
-                        // update purchaseOrders
+                        // remove PO from array
                         removePurchaseOrder(timestamps[i], k);
-
                     }
-                     // break
                     k = purchaseOrders[timestamps[i]].length;
                 }
             }
@@ -331,8 +324,6 @@ contract Gravity is KeeperCompatibleInterface {
                 i -= 1;
             }
         }
-        
-        // reduce scheduledBalance by _amount
         accounts[msg.sender].scheduledBalance -= _amount;
         (bool success) = IERC20(_token).transfer(msg.sender, _amount);
         require(success, "Withdrawal unsuccessful");
