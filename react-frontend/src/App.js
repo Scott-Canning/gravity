@@ -88,7 +88,7 @@ function App() {
 
     const srcAsset = userAccount[1]
     setSrcAsset(tokenAddressesRev[srcAsset]);
-    const srcAssetBal = ethers.utils.formatEther(userAccount[3]); // not sure this is the right index
+    const srcAssetBal = ethers.utils.formatEther(userAccount[4]); // not sure this is the right index
     setSrcAssetBal(srcAssetBal);
     const tgtAsset = userAccount[2]
     setTgtAsset(tokenAddressesRev[tgtAsset]);
@@ -216,7 +216,7 @@ function App() {
               Source Asset: {srcAsset}
             </li>
             <li>
-              Source Asset Balance: {srcAssetBal}
+              Scheduled Balance: {srcAssetBal}
             </li>
             <li>
               Target Asset: {tgtAsset}
