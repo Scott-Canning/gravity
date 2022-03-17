@@ -145,12 +145,18 @@ contract Gravity is KeeperCompatibleInterface {
             _purchasesRemaining += 1;
         }
 
+        // naive target balance carry over if existing user initiates new strategy
+        uint _targetBalance = 0;
+        if(accounts[msg.sender].targetBalance > 0){
+            _targetBalance += accounts[msg.sender].targetBalance;
+        }
+
         accounts[msg.sender] = Account(_accountStart, 
                                        _sourceAsset, 
                                        _targetAsset, 
                                        _sourceBalance, 
                                        0, 
-                                       0, 
+                                       _targetBalance, 
                                        _interval,
                                        _purchaseAmount,
                                        _purchasesRemaining,
@@ -226,6 +232,10 @@ contract Gravity is KeeperCompatibleInterface {
                     accounts[purchaseOrders[_nextSlot][i].user].purchasesRemaining -= 1;
                     accounts[purchaseOrders[_nextSlot][i].user].targetBalance += purchaseOrders[_nextSlot][i].purchaseAmount * _targetPurchased / _toPurchase;
                 }
+
+                // delete purchaseOrder
+                delete purchaseOrders[_nextSlot];
+
                 emit PurchaseExecuted(_nextSlot, _targetPurchased);
             } else {
                 emit PerformUpkeepFailed(block.timestamp);
