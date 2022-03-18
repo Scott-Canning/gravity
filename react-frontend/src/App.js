@@ -49,6 +49,8 @@ function App() {
   const contractJSONs = {};
   contractJSONs['DAI'] = daiJSON;
   contractJSONs['LINK'] = linkJSON;
+
+const ZEROS = '000000000000000000';
   
   if(ethereum) {
     ethereum.request({ method: 'eth_requestAccounts' });
@@ -98,18 +100,29 @@ function App() {
 
   async function initiateNewStrategy() {
     //const depositBigNum = ethers.BigNumber.from("depositAmount" + "");
+    
     const signer = await provider.getSigner();
     const tokenInstance = new ethers.Contract(tokenAddresses[depositAsset], contractJSONs[depositAsset], signer);
     console.log("tokenInstance address:", tokenAddresses[depositAsset]);
-    const approve = await tokenInstance.approve(GRAVITY, depositAmount);
+
+    // Format Deposit Amount 
+    const depositAmountFormatted = formatZeros(depositAmount);
+    console.log("depositAmount: ", depositAmount);
+    console.log("depositAmountFormatted: ", depositAmountFormatted);
+
+    const purchaseAmountFormatted = formatZeros(purchaseAmount);
+    console.log("purchaseAmount: ", purchaseAmount);
+    console.log("purchaseAmountFormatted: ", purchaseAmountFormatted);
+
+    const approve = await tokenInstance.approve(GRAVITY, depositAmountFormatted);
     console.log("approve: ", approve);
 
     const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
     const initStrategy = await contractInstance.initiateNewStrategy(tokenAddresses[depositAsset], 
                                                                     tokenAddresses['ETH'], 
-                                                                    depositAmount,
+                                                                    depositAmountFormatted,
                                                                     1,
-                                                                    purchaseAmount,
+                                                                    purchaseAmountFormatted,
                                                                     {gasLimit: 1500000}); //30000000
     console.log("initiateNewStrategy: ", initStrategy);
     console.log("source asset address:", tokenAddresses[depositAsset]);
@@ -127,6 +140,12 @@ function App() {
     const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
     const withdraw = await contractInstance.withdraw(withdrawAsset, withdrawAmount, {gasLimit: 350000});
     console.log("deposit: ", withdraw);
+  }
+
+  // format deposit and purchase amounts to have 18 zeros.
+  async function formatZeros(_amount) {
+    const amount = _amount + ZEROS;
+    return(amount);
   }
 
   return (
