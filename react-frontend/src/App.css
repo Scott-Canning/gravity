@@ -1,5 +1,6 @@
 .App {
   text-align: center;
+  background-color: #282c34;
 }
 
 .App-logo {
@@ -32,7 +33,18 @@
   text-align: left;
   font-size: 3rem;
   font-family: futura;
-  padding: 1rem;
+  color: rgb(157, 236, 143);
+  padding-left: 36px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.sub-title {
+  font-family: futura;
+  margin-left: 10px;
+  margin-right: 10px;
+  margin-top: 10px;
+  margin-bottom: 3px;
 }
 
 .user-info {
@@ -42,7 +54,7 @@
   padding: 1rem;
 }
 
-.user-balances {
+.account-details {
   text-align: left;
   font-size: 16px;
   font-family: futura;
@@ -50,14 +62,14 @@
 }
 
 /* Manage Strategies */
-
 .container {
   display: block;
   float: left;
   text-align: left;
   font-size: 16px;
   font-family: futura;
-  padding: 1rem;
+  padding-top: 10px;
+  padding-left: 26px;
   height: auto;
   width: 90%;
 }
@@ -72,38 +84,73 @@
   text-align: left;
   font-size: 16px;
   font-family: futura;
+  color: white;
   width: 45%;
-  height: 200px;
+  height: 215px;
+  padding: 10px;
+  margin: 10px;
   position: relative;
   border-color: black;
-  border-width: 1px;
-  border-style: dashed;
-  /* background-color: lightgray; */
+  border-width: 0px;
+  border-radius: 10px;
+  border-style: solid;
+  background-color: rgb(41, 44, 51);
 }
 
 .withdraw {
-  float: right;
+  float: left;
   text-align: left;
   font-size: 16px;
   font-family: futura;
+  color: white;
   width: 45%;
-  height: 200px;
+  height: 110px;
+  padding: 10px;
+  margin: 10px;
   position: relative;
   border-color: black;
-  border-width: 1px;
-  border-style: dashed;
-  /* background-color: lightgray; */
+  border-width: 0px;
+  border-radius: 10px;
+  border-style: solid;
+  background-color: rgb(41, 44, 51);
+}
+
+.strategy-details {
+  float: left;
+  text-align: left;
+  font-size: 16px;
+  font-family: futura;
+  color: white;
+  width: 45%;
+  height: 215px;
+  padding: 10px;
+  margin: 10px;
+  position: relative;
+  border-color: black;
+  border-width: 0px;
+  border-radius: 10px;
+  border-style: solid;
+  background-color: rgb(41, 44, 51);
 }
 
 button {
   display: flex;
   font-size: 16px;
   font-family: futura;
+  color: rgb(157, 236, 143);
   margin: 10px;
-  padding: 5px;
-  bottom: 0px;
+  padding: 7px;
+  bottom: 5px;
   position: absolute;
+  border-color: rgb(157, 236, 143);
+  border-width: 1px;
+  border-radius: 5px;
+  border-style: solid;
+  background-color: rgb(0, 0, 0);
 }
+
+button:hover{background-color:rgb(170, 166, 157);}
+button:active{background-color:rgb(255, 255, 255);}
 
 .input-row {
   padding: 1rem;
@@ -118,6 +165,9 @@ button {
 
 .input-row input {
   float: right;
+  text-align: right;
+  font-size: 16px;
+  width: 40%;
 }
 
 /* My Strategies */
@@ -127,6 +177,12 @@ button {
   font-size: 16px;
   font-family: futura;
   padding: 1rem;
+}
+
+ul.no-bullets {
+  list-style-type: none; /* Remove bullets */
+  padding-left: 10px; /* Remove padding */
+  margin: 0; /* Remove margins */
 }
 
 @keyframes App-logo-spin {

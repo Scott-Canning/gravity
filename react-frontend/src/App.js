@@ -4,12 +4,12 @@ import React from 'react';
 import { GRAVITY_KOVAN, DAI_KOVAN, WETH_KOVAN, LINK_KOVAN } from './Addresses.js';
 import gravityJSON from './utils/gravity.json';
 import daiJSON from './utils/dai.json';
+import wethJSON from './utils/weth.json';
 import linkJSON from './utils/link.json';
 
+
 const GRAVITY = GRAVITY_KOVAN;
-const DAI = DAI_KOVAN;
-const WETH = WETH_KOVAN;
-const LINK = LINK_KOVAN;
+const CONTRACT_URL = "https://kovan.etherscan.io/address/" + GRAVITY;
 
 function App() {
   const [address, setAddress] = React.useState("");
@@ -18,39 +18,49 @@ function App() {
   // State variables for user erc20 balances.
   const [daiBalance, setDaiBalance] = React.useState("");
   const [linkBalance, setLinkBalance] = React.useState("");
-  //const [wethBalance, setWethBalance] = React.useState("");
+  const [wethBalance, setWethBalance] = React.useState("");
   
   const [depositAsset, setDepositAsset] = React.useState("");
   const [depositAmount, setDepositAmount] = React.useState("");
   const [purchaseAmount, setPurchaseAmount] = React.useState("");
-  const [withdrawAsset, setWithdrawAsset] = React.useState("");
-  const [withdrawAmount, setWithdrawAmount] = React.useState("");
+  const [purchaseInterval, setPurchaseInterval] = React.useState("");
+
+  // withdraw state
+  const [withdrawSrcAmount, setWithdrawSrcAmount] = React.useState("");
+  const [withdrawTgtAmount, setWithdrawTgtAmount] = React.useState("");
 
   // State variables for user account details
-  const [ordersCount, setOrdersCount] = React.useState("");
+  //const [ordersCount, setOrdersCount] = React.useState("");
   const [srcAsset, setSrcAsset] = React.useState("");
   const [srcAssetBal, setSrcAssetBal] = React.useState("");
   const [tgtAsset, setTgtAsset] = React.useState("");
   const [tgtAssetBal, setTgtAssetBal] = React.useState("");
+  const [purchInterval, setPurchInterval] = React.useState("");
+  // const [scheduleTimestamps, setScheduleTimestamps] = React.useState([]);
+  // const [schedulePurchases, setSchedulePurchases] = React.useState([]);
+  const [purchaseSchedule, setPurchaseSchedule] = React.useState({});
 
   const { ethereum } = window;
   let provider;
 
-  const tokenAddresses = {};
-  tokenAddresses['DAI'] = DAI_KOVAN;
-  tokenAddresses['ETH'] = WETH_KOVAN;
-  tokenAddresses['LINK'] = LINK_KOVAN;
+  const tokenAddresses = {
+    'DAI': DAI_KOVAN,
+    'WETH': WETH_KOVAN,
+    'LINK': LINK_KOVAN,
+  };
 
   const tokenAddressesRev = {};
-  tokenAddressesRev[DAI_KOVAN] = 'DAI';
-  tokenAddressesRev[WETH_KOVAN] = 'ETH';
-  tokenAddressesRev[LINK_KOVAN] = 'LINK';
+    tokenAddressesRev[DAI_KOVAN] = 'DAI';
+    tokenAddressesRev[WETH_KOVAN] = 'WETH';
+    tokenAddressesRev[LINK_KOVAN] = 'LINK';
+  
+  const contractJSONs = {
+    'DAI': daiJSON,
+    'WETH': wethJSON,
+    'LINK': linkJSON
+  };
 
-  const contractJSONs = {};
-  contractJSONs['DAI'] = daiJSON;
-  contractJSONs['LINK'] = linkJSON;
-
-const ZEROS = '000000000000000000';
+  //const ZEROS = '000000000000000000';
   
   if(ethereum) {
     ethereum.request({ method: 'eth_requestAccounts' });
@@ -64,7 +74,6 @@ const ZEROS = '000000000000000000';
     const signer = await provider.getSigner();
     const userAddress = await signer.getAddress();
     const userBalance = await provider.getBalance(userAddress);
-    //console.log("User Balance: ", userBalance);
     setAddress(userAddress);
     setBalance(ethers.utils.formatEther(userBalance));
 
@@ -72,155 +81,199 @@ const ZEROS = '000000000000000000';
     const userDaiBalance = await daiContract.balanceOf(userAddress);
     setDaiBalance(ethers.utils.formatEther(userDaiBalance));
 
+    const wethContract = new ethers.Contract(WETH_KOVAN, linkJSON, signer);
+    const userWethBalance = await wethContract.balanceOf(userAddress);
+    setWethBalance(ethers.utils.formatEther(userWethBalance));
+
     const linkContract = new ethers.Contract(LINK_KOVAN, linkJSON, signer);
     const userLinkBalance = await linkContract.balanceOf(userAddress);
     setLinkBalance(ethers.utils.formatEther(userLinkBalance));
-
-    const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
     
     // account strategy information
+    const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
     const userAccount = await contractInstance.accounts(userAddress);
+    // console.log(userAccount);
     const srcAsset = userAccount[1]
     setSrcAsset(tokenAddressesRev[srcAsset]);
-    const srcAssetBal = ethers.utils.formatEther(userAccount[4]); // not sure this is the right index
+    const srcAssetBal = ethers.utils.formatUnits(userAccount[4]); //formatEther(userAccount[4]);
     setSrcAssetBal(srcAssetBal);
     const tgtAsset = userAccount[2]
     setTgtAsset(tokenAddressesRev[tgtAsset]);
     const tgtAssetBal = ethers.utils.formatEther(userAccount[5]);
     setTgtAssetBal(tgtAssetBal);
+    const purchInterval = ethers.utils.formatUnits(userAccount[6].toString());
+    setPurchInterval(purchInterval[19]);  // has to be a better way to parse this value;
 
-    // Display puchase orders
-    //const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
-    const purchaseOrders = await contractInstance.purchaseOrders;
-    const poCount = purchaseOrders.length;
-    //console.log("PURCHASE ORDERS: ", purchaseOrders);
-    console.log(poCount);
-    setOrdersCount(poCount);
+    // // display puchase orders
+    // const purchaseOrders = await contractInstance.purchaseOrders;
+    // const poCount = purchaseOrders.length;
+    // //console.log("PURCHASE ORDERS: ", purchaseOrders);
+    // setOrdersCount(poCount);
   }
 
   async function initiateNewStrategy() {
-    //const depositBigNum = ethers.BigNumber.from("depositAmount" + "");
-    
     const signer = await provider.getSigner();
     const tokenInstance = new ethers.Contract(tokenAddresses[depositAsset], contractJSONs[depositAsset], signer);
-    console.log("tokenInstance address:", tokenAddresses[depositAsset]);
 
-    // Format Deposit Amount 
-    const depositAmountFormatted = formatZeros(depositAmount);
-    console.log("depositAmount: ", depositAmount);
-    console.log("depositAmountFormatted: ", depositAmountFormatted);
-
-    const purchaseAmountFormatted = formatZeros(purchaseAmount);
-    console.log("purchaseAmount: ", purchaseAmount);
-    console.log("purchaseAmountFormatted: ", purchaseAmountFormatted);
-
-    const approve = await tokenInstance.approve(GRAVITY, depositAmountFormatted);
-    console.log("approve: ", approve);
+    const parsedDepositAmt = ethers.utils.parseUnits(depositAmount.toString(), 18);
+    const parsedPurchaseAmt = ethers.utils.parseUnits(purchaseAmount.toString(), 18);
+    
+    const approve = await tokenInstance.approve(GRAVITY, parsedDepositAmt);
+    // console.log("approve: ", approve);
 
     const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
     const initStrategy = await contractInstance.initiateNewStrategy(tokenAddresses[depositAsset], 
-                                                                    tokenAddresses['ETH'], 
-                                                                    depositAmountFormatted,
-                                                                    1,
-                                                                    purchaseAmountFormatted,
-                                                                    {gasLimit: 1500000}); //30000000
-    console.log("initiateNewStrategy: ", initStrategy);
-    console.log("source asset address:", tokenAddresses[depositAsset]);
+                                                                    tokenAddresses['WETH'], 
+                                                                    parsedDepositAmt,
+                                                                    purchaseInterval,
+                                                                    parsedPurchaseAmt,
+                                                                    {gasLimit: 1500000});
+    // console.log("initiateNewStrategy: ", initStrategy);
   }
 
-  // async function getTargetAssetBalance() {
-  //   const signer = await provider.getSigner();
-  //   const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
-  //   const targetAssetBalance = await contractInstance.accounts(signer.address).targetBalance;
-  //   setTargetAssetBalance(ethers.utils.formatEther(targetAssetBalance));
-  // }
-
-  async function withdraw() {
+  async function withdrawSource() {
+    const parsedAmount = ethers.utils.parseUnits(withdrawTgtAmount.toString());
     const signer = await provider.getSigner();
     const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
-    const withdraw = await contractInstance.withdraw(withdrawAsset, withdrawAmount, {gasLimit: 350000});
-    console.log("deposit: ", withdraw);
+    const withdrawSource = await contractInstance.withdrawSource(tokenAddresses['DAI'], parsedAmount, {gasLimit: 750000});
+    //console.log("withdrawSource: ", withdrawSource);
+  }
+
+  async function withdrawTarget() {
+    const parsedAmount = ethers.utils.parseUnits(withdrawTgtAmount.toString());
+    const signer = await provider.getSigner();
+    const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
+    const withdrawTarget = await contractInstance.withdrawTarget(tokenAddresses['WETH'], parsedAmount, {gasLimit: 350000});
+    //console.log("withdrawTarget: ", withdrawTarget);
+  }
+
+  async function reconstructSchedule() {
+    const signer = await provider.getSigner();
+    const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
+    const readSchedule = await contractInstance.reconstructSchedule(signer.getAddress());
+    const [ timestamps, purchaseAmounts ] = readSchedule;
+    console.log(readSchedule);
+    // let tempTimestamps = [];
+    // let tempPurchases = [];
+    let tempSchedule = {};
+
+    for(let i = 0; i < timestamps.length; i++) {
+      let formattedTimestamp = timeConverter(ethers.utils.formatEther(timestamps[i]) * 1e18);
+      // tempTimestamps.push(formattedTimestamp);
+      // tempPurchases.push(ethers.utils.formatEther(purchaseAmounts[i]), 18);
+      tempSchedule[formattedTimestamp] = purchaseAmounts[i];
+    }
+    //console.log(tempSchedule);
+    setPurchaseSchedule(tempSchedule);
+    // setScheduleTimestamps(tempTimestamps);
+    // setSchedulePurchases(tempPurchases);
+  }
+
+  function timeConverter(UNIX_timestamp){
+    let a = new Date(UNIX_timestamp * 1000);
+    let months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    let year = a.getFullYear();
+    let month = months[a.getMonth()];
+    let date = a.getDate();
+    let hour = a.getHours();
+    let min =  a.getMinutes();
+    if(min.length > 1) {
+      min = "0" + min;
+      min = min.substring(-2);
+    }
+    let time = date + ' ' + month + ' ' + year + ' ' + hour + ':' + min;//.substring(-2);
+    return time.toString();
   }
 
   // format deposit and purchase amounts to have 18 zeros.
-  async function formatZeros(_amount) {
-    const amount = _amount + ZEROS;
-    return(amount);
-  }
+  // async function formatZeros(_amount) {
+  //   const amount = _amount + ZEROS;
+  //   return(amount);
+  // }
 
   return (
     <div className="App">
       <div className="title">
-        Gravity [Kovan]
+        Gravity
       </div>
-      <div className="user-info">
-        <h3>Contract Details</h3>
-        <ul>
+      <div className="container">
+        <h3 className="sub-title">Addresses</h3>
+        <ul className="no-bullets">
           <li>
-            Contract address: {GRAVITY}
+            Contract: <a href={CONTRACT_URL} target="_blank">{GRAVITY}</a>
           </li>
           <li>
-            Your address: {address}
-          </li>
-        </ul>
-      </div>
-      <div className="user-balances">
-        <h3>Your Balances</h3>
-        <ul>
-          <li>
-            ETH: {balance}
-          </li>
-          <li>
-            DAI: {daiBalance}
-          </li>
-          <li>
-            LINK: {linkBalance}
-          </li>
-          <li>
-            WETH: {/* {wethBalance} */}
+            Account: {address}
           </li>
         </ul>
       </div>
       <div className="container">
-        <h3>Manage Strategies</h3>
+          <h3 className="sub-title">Account Balances</h3>
+          <ul className="no-bullets">
+            <li>
+              ETH: {balance}
+            </li>
+            <li>
+              DAI: {daiBalance}
+            </li>
+            <li>
+              LINK: {linkBalance}
+            </li>
+            <li>
+              WETH: {wethBalance}
+            </li>
+          </ul>
+        </div>
+      <div className="container">
+        <h3 className="sub-title"> Manage Strategy</h3>
         <div className="deposit">
-          <b>Open New (Deposit)</b>
+          <b>Configure New DCA Strategy</b>
           <div className="input-row">
-            <label> Deposit Asset: </label>
+            <label> Funding Asset: </label>
             <input  value={depositAsset} onInput={e => setDepositAsset(e.target.value)}/>
           </div>
           <div className="input-row">
-            <label> Deposit Amount: </label>
+            <label> Funding Amount: </label>
             <input  value={depositAmount} onInput={e => setDepositAmount(e.target.value)}/>
           </div>
           <div className="input-row">
             <label> Purchase Amount: </label>
             <input  value={purchaseAmount} onInput={e => setPurchaseAmount(e.target.value)}/>
           </div>
-          <div className="deposit-button">
-            <button onClick={initiateNewStrategy}> Initiate Strategy </button>
+          <div className="input-row">
+            <label> Purchase Interval: </label>
+            <input  value={purchaseInterval} onInput={e => setPurchaseInterval(e.target.value)}/>
           </div>
+            <div className="deposit-button">
+              <button onClick={initiateNewStrategy}> Initiate Strategy </button>
+            </div>
         </div>
         
         <div className="withdraw">
-          <b>Close Strategy (Withdraw)</b>
-          <div className="input-row">
-            <label> Withdraw Asset: </label>
-            <input value={withdrawAsset} onInput={e => setWithdrawAsset(e.target.value)}/>
-          </div>
+          <b>Withdraw Funding Asset</b>
           <div className="input-row">     
             <label> Withdraw Amount: </label>
-            <input value={withdrawAmount} onInput={e => setWithdrawAmount(e.target.value)}/>
+            <input value={withdrawSrcAmount} onInput={e => setWithdrawSrcAmount(e.target.value)}/>
           </div>
           <div className="withdraw-button">  
-            <button  onClick={withdraw}> Withdraw </button>
+            <button  onClick={withdrawSource}> Withdraw </button>
+          </div>
+        </div>
+        <div className="withdraw">
+          <b>Withdraw Target Asset</b>
+          <div className="input-row">     
+            <label> Withdraw Amount: </label>
+            <input value={withdrawTgtAmount} onInput={e => setWithdrawTgtAmount(e.target.value)}/>
+          </div>
+          <div className="withdraw-button">  
+            <button  onClick={withdrawTarget}> Withdraw </button>
           </div>
         </div>
       </div>
       <div className="container">
-        <div className="user-strategies">
-          <h3>Open Strategy</h3>
-          <ul>
+        <h3 className="sub-title">Live Strategy Details</h3>
+        <div className ="strategy-details">
+          <ul className="no-bullets">
             <li>
               Source Asset: {srcAsset}
             </li>
@@ -234,9 +287,25 @@ const ZEROS = '000000000000000000';
               Target Asset Balance: {tgtAssetBal}
             </li>
             <li>
-              Open Orders: {ordersCount}
+              Purchase Interval: {purchInterval}
             </li>
           </ul>
+        </div>
+        <div className ="strategy-details">
+          <div>
+            { Object.keys(purchaseSchedule).map((key, index) => { 
+              return (
+                  <p key={index}> {key} {purchaseSchedule[{key}]}</p>
+              );
+              })
+            }
+            {/* Object.entries(purchaseSchedule).forEach(([key, value]) => {
+              <p>key value</p>
+            }); */}
+          </div>
+          <div className="schedule-button">  
+            <button onClick={reconstructSchedule}> Get Schedule </button>
+          </div>
         </div>
       </div>
     </div>
