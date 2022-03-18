@@ -7,6 +7,7 @@ import daiJSON from './utils/dai.json';
 import wethJSON from './utils/weth.json';
 import linkJSON from './utils/link.json';
 
+
 const GRAVITY = GRAVITY_KOVAN;
 const CONTRACT_URL = "https://kovan.etherscan.io/address/" + GRAVITY;
 
@@ -22,31 +23,35 @@ function App() {
   const [depositAsset, setDepositAsset] = React.useState("");
   const [depositAmount, setDepositAmount] = React.useState("");
   const [purchaseAmount, setPurchaseAmount] = React.useState("");
-  const [purchaseFrequency, setPurchaseFrequency] = React.useState("");
+  const [purchaseInterval, setPurchaseInterval] = React.useState("");
+
+  // withdraw state
   const [withdrawSrcAmount, setWithdrawSrcAmount] = React.useState("");
   const [withdrawTgtAmount, setWithdrawTgtAmount] = React.useState("");
 
   // State variables for user account details
-  const [ordersCount, setOrdersCount] = React.useState("");
+  //const [ordersCount, setOrdersCount] = React.useState("");
   const [srcAsset, setSrcAsset] = React.useState("");
   const [srcAssetBal, setSrcAssetBal] = React.useState("");
   const [tgtAsset, setTgtAsset] = React.useState("");
   const [tgtAssetBal, setTgtAssetBal] = React.useState("");
-  const [scheduleTimestamps, setScheduleTimestamps] = React.useState([]);
-  const [schedulePurchases, setSchedulePurchases] = React.useState([]);
+  const [purchInterval, setPurchInterval] = React.useState("");
+  // const [scheduleTimestamps, setScheduleTimestamps] = React.useState([]);
+  // const [schedulePurchases, setSchedulePurchases] = React.useState([]);
+  const [purchaseSchedule, setPurchaseSchedule] = React.useState({});
 
   const { ethereum } = window;
   let provider;
 
   const tokenAddresses = {
     'DAI': DAI_KOVAN,
-    'ETH': WETH_KOVAN,
+    'WETH': WETH_KOVAN,
     'LINK': LINK_KOVAN,
   };
 
   const tokenAddressesRev = {};
     tokenAddressesRev[DAI_KOVAN] = 'DAI';
-    tokenAddressesRev[WETH_KOVAN] = 'ETH';
+    tokenAddressesRev[WETH_KOVAN] = 'WETH';
     tokenAddressesRev[LINK_KOVAN] = 'LINK';
   
   const contractJSONs = {
@@ -55,7 +60,7 @@ function App() {
     'LINK': linkJSON
   };
 
-  const ZEROS = '000000000000000000';
+  //const ZEROS = '000000000000000000';
   
   if(ethereum) {
     ethereum.request({ method: 'eth_requestAccounts' });
@@ -87,65 +92,59 @@ function App() {
     // account strategy information
     const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
     const userAccount = await contractInstance.accounts(userAddress);
+    // console.log(userAccount);
     const srcAsset = userAccount[1]
     setSrcAsset(tokenAddressesRev[srcAsset]);
-    const srcAssetBal = ethers.utils.formatEther(userAccount[4]); // not sure this is the right index
+    const srcAssetBal = ethers.utils.formatUnits(userAccount[4]); //formatEther(userAccount[4]);
     setSrcAssetBal(srcAssetBal);
     const tgtAsset = userAccount[2]
     setTgtAsset(tokenAddressesRev[tgtAsset]);
     const tgtAssetBal = ethers.utils.formatEther(userAccount[5]);
     setTgtAssetBal(tgtAssetBal);
+    const purchInterval = ethers.utils.formatUnits(userAccount[6].toString());
+    setPurchInterval(purchInterval[19]);  // has to be a better way to parse this value;
 
-    // display puchase orders
-    //const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
-    const purchaseOrders = await contractInstance.purchaseOrders;
-    const poCount = purchaseOrders.length;
-    //console.log("PURCHASE ORDERS: ", purchaseOrders);
-    setOrdersCount(poCount);
+    // // display puchase orders
+    // const purchaseOrders = await contractInstance.purchaseOrders;
+    // const poCount = purchaseOrders.length;
+    // //console.log("PURCHASE ORDERS: ", purchaseOrders);
+    // setOrdersCount(poCount);
   }
 
   async function initiateNewStrategy() {
     const signer = await provider.getSigner();
     const tokenInstance = new ethers.Contract(tokenAddresses[depositAsset], contractJSONs[depositAsset], signer);
-    console.log("tokenInstance address:", tokenAddresses[depositAsset]);
 
-    // Format Deposit Amount 
-    const depositAmountFormatted = formatZeros(depositAmount);
-    console.log("depositAmount: ", depositAmount);
-    console.log("depositAmountFormatted: ", depositAmountFormatted);
-
-    const purchaseAmountFormatted = formatZeros(purchaseAmount);
-    console.log("purchaseAmount: ", purchaseAmount);
-    console.log("purchaseAmountFormatted: ", purchaseAmountFormatted);
-
-    const approve = await tokenInstance.approve(GRAVITY, depositAmountFormatted);
-    console.log("approve: ", approve);
+    const parsedDepositAmt = ethers.utils.parseUnits(depositAmount.toString(), 18);
+    const parsedPurchaseAmt = ethers.utils.parseUnits(purchaseAmount.toString(), 18);
+    
+    const approve = await tokenInstance.approve(GRAVITY, parsedDepositAmt);
+    // console.log("approve: ", approve);
 
     const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
     const initStrategy = await contractInstance.initiateNewStrategy(tokenAddresses[depositAsset], 
-                                                                    tokenAddresses['ETH'], 
-                                                                    depositAmountFormatted,
-                                                                    purchaseFrequency,
-                                                                    purchaseAmountFormatted,
+                                                                    tokenAddresses['WETH'], 
+                                                                    parsedDepositAmt,
+                                                                    purchaseInterval,
+                                                                    parsedPurchaseAmt,
                                                                     {gasLimit: 1500000});
-    console.log("initiateNewStrategy: ", initStrategy);
-    console.log("source asset address:", tokenAddresses[depositAsset]);
+    // console.log("initiateNewStrategy: ", initStrategy);
   }
 
   async function withdrawSource() {
-    const formattedWithdrawalAmount = formatZeros(withdrawSrcAmount);
+    const parsedAmount = ethers.utils.parseUnits(withdrawTgtAmount.toString());
     const signer = await provider.getSigner();
     const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
-    const withdrawSource = await contractInstance.withdrawSource(tokenAddresses['DAI'], formattedWithdrawalAmount, {gasLimit: 750000});
-    console.log("withdrawSource: ", withdrawSource);
+    const withdrawSource = await contractInstance.withdrawSource(tokenAddresses['DAI'], parsedAmount, {gasLimit: 750000});
+    //console.log("withdrawSource: ", withdrawSource);
   }
 
   async function withdrawTarget() {
-    const formattedWithdrawalAmount = formatZeros(withdrawTgtAmount);
+    const parsedAmount = ethers.utils.parseUnits(withdrawTgtAmount.toString());
     const signer = await provider.getSigner();
     const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
-    const withdrawTarget = await contractInstance.withdrawTarget(tokenAddresses['WETH'], formattedWithdrawalAmount, {gasLimit: 350000});
-    console.log("withdrawTarget: ", withdrawTarget);
+    const withdrawTarget = await contractInstance.withdrawTarget(tokenAddresses['WETH'], parsedAmount, {gasLimit: 350000});
+    //console.log("withdrawTarget: ", withdrawTarget);
   }
 
   async function reconstructSchedule() {
@@ -153,31 +152,44 @@ function App() {
     const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
     const readSchedule = await contractInstance.reconstructSchedule(signer.getAddress());
     const [ timestamps, purchaseAmounts ] = readSchedule;
-    let tempTimestamps = [];
-    let tempPurchases = [];
+    console.log(readSchedule);
+    // let tempTimestamps = [];
+    // let tempPurchases = [];
+    let tempSchedule = {};
 
     for(let i = 0; i < timestamps.length; i++) {
-      tempTimestamps.push(ethers.utils.formatEther(timestamps[i]) * 1e18);
+      let formattedTimestamp = timeConverter(ethers.utils.formatEther(timestamps[i]) * 1e18);
+      // tempTimestamps.push(formattedTimestamp);
+      // tempPurchases.push(ethers.utils.formatEther(purchaseAmounts[i]), 18);
+      tempSchedule[formattedTimestamp] = purchaseAmounts[i];
     }
-    for(let i = 0; i < purchaseAmounts.length; i++) {
-      tempPurchases.push(ethers.utils.formatEther(purchaseAmounts[i]));
-    }
+    //console.log(tempSchedule);
+    setPurchaseSchedule(tempSchedule);
+    // setScheduleTimestamps(tempTimestamps);
+    // setSchedulePurchases(tempPurchases);
+  }
 
-    setScheduleTimestamps(tempTimestamps => [...tempTimestamps, `${tempTimestamps.length}`]);
-    setSchedulePurchases(tempPurchases => [...tempPurchases, `${tempPurchases.length}`]);
-    //setScheduleTimestamps(timestamps);
-    //setSchedulePurchases(purchaseAmounts);
-    console.log("tempTimestamps: ", tempTimestamps);
-    console.log("scheduleTimestamps: ", scheduleTimestamps);
-    console.log("tempPurchases: ", tempPurchases);
-    console.log("tempPurchases: ", schedulePurchases);
+  function timeConverter(UNIX_timestamp){
+    let a = new Date(UNIX_timestamp * 1000);
+    let months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    let year = a.getFullYear();
+    let month = months[a.getMonth()];
+    let date = a.getDate();
+    let hour = a.getHours();
+    let min =  a.getMinutes();
+    if(min.length > 1) {
+      min = "0" + min;
+      min = min.substring(-2);
+    }
+    let time = date + ' ' + month + ' ' + year + ' ' + hour + ':' + min;//.substring(-2);
+    return time.toString();
   }
 
   // format deposit and purchase amounts to have 18 zeros.
-  async function formatZeros(_amount) {
-    const amount = _amount + ZEROS;
-    return(amount);
-  }
+  // async function formatZeros(_amount) {
+  //   const amount = _amount + ZEROS;
+  //   return(amount);
+  // }
 
   return (
     <div className="App">
@@ -213,9 +225,7 @@ function App() {
           </ul>
         </div>
       <div className="container">
-        <h3 className="sub-title">
-          Manage Strategy
-        </h3>
+        <h3 className="sub-title"> Manage Strategy</h3>
         <div className="deposit">
           <b>Configure New DCA Strategy</b>
           <div className="input-row">
@@ -231,8 +241,8 @@ function App() {
             <input  value={purchaseAmount} onInput={e => setPurchaseAmount(e.target.value)}/>
           </div>
           <div className="input-row">
-            <label> Purchase Frequency: </label>
-            <input  value={purchaseFrequency} onInput={e => setPurchaseFrequency(e.target.value)}/>
+            <label> Purchase Interval: </label>
+            <input  value={purchaseInterval} onInput={e => setPurchaseInterval(e.target.value)}/>
           </div>
             <div className="deposit-button">
               <button onClick={initiateNewStrategy}> Initiate Strategy </button>
@@ -261,7 +271,7 @@ function App() {
         </div>
       </div>
       <div className="container">
-        <h3 className="sub-title">Live Strategy</h3>
+        <h3 className="sub-title">Live Strategy Details</h3>
         <div className ="strategy-details">
           <ul className="no-bullets">
             <li>
@@ -277,24 +287,21 @@ function App() {
               Target Asset Balance: {tgtAssetBal}
             </li>
             <li>
-              Open Orders: {ordersCount}
+              Purchase Interval: {purchInterval}
             </li>
           </ul>
         </div>
         <div className ="strategy-details">
           <div>
-            Timestamps: 
-            {/* { scheduleTimestamps.map((timestamp) => { 
-              return (timestamp);
+            { Object.keys(purchaseSchedule).map((key, index) => { 
+              return (
+                  <p key={index}> {key} {purchaseSchedule[{key}]}</p>
+              );
               })
-            } */}
-          </div>
-          <div>
-          Purchase Amounts: 
-            {/* { schedulePurchases.map((timestamp) => { 
-              return (timestamp);
-              })
-            } */}
+            }
+            {/* Object.entries(purchaseSchedule).forEach(([key, value]) => {
+              <p>key value</p>
+            }); */}
           </div>
           <div className="schedule-button">  
             <button onClick={reconstructSchedule}> Get Schedule </button>

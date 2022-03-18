@@ -179,8 +179,8 @@ contract Gravity is KeeperCompatibleInterface {
                                        _targetBalance, 
                                        _interval,
                                        _purchaseAmount,
-                                       _purchasesRemaining,
-                                       false);
+                                       _purchasesRemaining
+                                       );
 
         // populate purchaseOrders mapping
         uint _unixNextSlot = _accountStart - (_accountStart % upKeepInterval) + 2 * upKeepInterval;
