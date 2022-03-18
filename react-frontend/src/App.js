@@ -75,17 +75,9 @@ function App() {
     setLinkBalance(ethers.utils.formatEther(userLinkBalance));
 
     const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
-    // Accounts
-
-    //const strAddress = userAddress.toString();
-   //const accountsList = await contractInstance.accounts(userAddress.toString()); //'0xa1d8f7707D088b92B22e70b9932eD49C4473e6B6'); //signer.address);
-    //const formatted = ethers.utils.formatEther(accountsList)
-    //console.log(formatted);
-    //console.log(accountsList);
-
+    
+    // account strategy information
     const userAccount = await contractInstance.accounts(userAddress);
-    console.log(userAccount);
-
     const srcAsset = userAccount[1]
     setSrcAsset(tokenAddressesRev[srcAsset]);
     const srcAssetBal = ethers.utils.formatEther(userAccount[4]); // not sure this is the right index
@@ -102,8 +94,6 @@ function App() {
     //console.log("PURCHASE ORDERS: ", purchaseOrders);
     console.log(poCount);
     setOrdersCount(poCount);
-
-
   }
 
   async function initiateNewStrategy() {
