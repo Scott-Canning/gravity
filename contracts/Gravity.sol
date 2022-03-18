@@ -101,9 +101,6 @@ contract Gravity is KeeperCompatibleInterface {
     }
     
     function lendCompound(address _tokenIn, uint256 _lendAmount) internal returns (uint) {
-        // this require is likely failing if deposit assets arent settled yet
-        // require(IERC20(_tokenIn).balanceOf(address(this)) > _lendAmount, "Insufficient balance to lend");
-
         // create a reference to the corresponding cToken contract, like cDAI
         CErc20 cToken = CErc20(0xF0d0EB522cfa50B716B3b1604C4F0fA6f04376AD);
 
@@ -125,7 +122,7 @@ contract Gravity is KeeperCompatibleInterface {
     }
 
     function redeemCompound(uint256 _redeemAmount) internal returns (bool) { 
-        require(_redeemAmount < amountLent, "Redemption amount exceeds lent amount");
+        require(_redeemAmount <= amountLent, "Redemption amount exceeds lent amount");
         CErc20 cToken = CErc20(0xF0d0EB522cfa50B716B3b1604C4F0fA6f04376AD);
     
         // retrieve asset based on an amount of the asset
@@ -197,13 +194,9 @@ contract Gravity is KeeperCompatibleInterface {
             }
         }
 
-        // deposit sourceBalance into contract
-        // depositSource(_sourceAsset, _sourceBalance);
-
         // [testing] compound lend
         depositSource(_sourceAsset, _sourceBalance);
-        uint _splitBalance = _sourceBalance / 2;
-        lendCompound(_sourceAsset, _splitBalance);
+        lendCompound(_sourceAsset, _sourceBalance / 2);
         emit NewStrategy(msg.sender);
     }
 
