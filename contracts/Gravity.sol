@@ -50,13 +50,14 @@ contract Gravity is KeeperCompatibleInterface {
         uint            interval;                               // 1, 7, 14, 21, 30
         uint            purchaseAmount;                         // purchase amount per interval of sourceBalance
         uint            purchasesRemaining;
-        bool            withdrawFlag;
     }
+
 
     struct PurchaseOrder {
         address user;
         uint    purchaseAmount;
     }
+
 
     constructor(address _sourceToken, address _targetToken, uint _upKeepInterval) {
         owner = payable(msg.sender);
@@ -77,6 +78,7 @@ contract Gravity is KeeperCompatibleInterface {
         // sourceTokens[address(0xd0A1E359811322d97991E03f863a0C30C2cF029C)] = true; // WETH
         // sourceTokens[address(0xa36085F69e2889c224210F603D836748e7dC0088)] = true; // LINK
     }
+
 
     function swap(address _tokenIn, address _tokenOut, uint256 _amountIn, uint256 _amountOutMin) internal returns (uint256 amountOut) {
         // approve router to spend tokenIn
@@ -100,6 +102,7 @@ contract Gravity is KeeperCompatibleInterface {
         amountOut = swapRouter.exactInputSingle(params);
     }
     
+
     function lendCompound(address _tokenIn, uint256 _lendAmount) internal returns (uint) {
         // create a reference to the corresponding cToken contract, like cDAI
         CErc20 cToken = CErc20(0xF0d0EB522cfa50B716B3b1604C4F0fA6f04376AD);
@@ -120,6 +123,7 @@ contract Gravity is KeeperCompatibleInterface {
         emit LentDAI(exchangeRate, supplyRate);
         return mintResult;
     }
+
 
     function redeemCompound(uint256 _redeemAmount) internal returns (bool) { 
         require(_redeemAmount <= amountLent, "Redemption amount exceeds lent amount");
@@ -328,10 +332,20 @@ contract Gravity is KeeperCompatibleInterface {
                 i -= 1;
             }
         }
-        accounts[msg.sender].scheduledBalance -= _amount;
-        (bool success) = IERC20(_token).transfer(msg.sender, _amount);
-        require(success, "Withdrawal unsuccessful");
-        emit WithdrawnSource(msg.sender, _amount);
+
+        // if treasury can cover, withdraw
+        if(_amount > IERC20(_token).balanceOf(address(this))){
+            accounts[msg.sender].scheduledBalance -= _amount;
+            (bool success) = IERC20(_token).transfer(msg.sender, _amount);
+            require(success, "Withdrawal unsuccessful");
+            emit WithdrawnSource(msg.sender, _amount);
+        } else { // redeem additional funds
+            redeemCompound(_amount - IERC20(_token).balanceOf(address(this)));
+            accounts[msg.sender].scheduledBalance -= _amount;
+            (bool success) = IERC20(_token).transfer(msg.sender, _amount);
+            require(success, "Withdrawal unsuccessful");
+            emit WithdrawnSource(msg.sender, _amount);
+        }
     }
 
     // withdraw target token
