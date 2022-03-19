@@ -164,7 +164,7 @@ function App() {
     let date = a.getDate();
     let hour = a.getHours();
     let min =  a.getMinutes();
-    if(min.length == 1) {
+    if(min.length === 1) {
       min = "0" + min;
       //min = min.substring(-2);
     }
