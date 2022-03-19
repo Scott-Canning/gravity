@@ -333,19 +333,14 @@ contract Gravity is KeeperCompatibleInterface {
             }
         }
 
-        // if treasury can cover, withdraw
+        // if treasury cannot cover, redeem
         if(_amount > IERC20(_token).balanceOf(address(this))){
-            accounts[msg.sender].scheduledBalance -= _amount;
-            (bool success) = IERC20(_token).transfer(msg.sender, _amount);
-            require(success, "Withdrawal unsuccessful");
-            emit WithdrawnSource(msg.sender, _amount);
-        } else { // redeem additional funds
             redeemCompound(_amount - IERC20(_token).balanceOf(address(this)));
-            accounts[msg.sender].scheduledBalance -= _amount;
-            (bool success) = IERC20(_token).transfer(msg.sender, _amount);
-            require(success, "Withdrawal unsuccessful");
-            emit WithdrawnSource(msg.sender, _amount);
         }
+        accounts[msg.sender].scheduledBalance -= _amount;
+        (bool success) = IERC20(_token).transfer(msg.sender, _amount);
+        require(success, "Withdrawal unsuccessful");
+        emit WithdrawnSource(msg.sender, _amount);
     }
 
     // withdraw target token
