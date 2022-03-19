@@ -175,8 +175,12 @@ function App() {
   return (
     <div className="App">
       <div className="title" >
-      <a href={CONTRACT_URL} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'inherit'}}>Gravity</a>
+        <a href={CONTRACT_URL} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'inherit'}}>Gravity</a>
+        <div className="sub-header">
+        Automated On-Chain Dollar Cost Averaging Strategies
       </div>
+      </div>
+
       <div className="container">
         <ul className="no-bullets">
           <li>
