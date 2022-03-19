@@ -74,6 +74,14 @@
   width: 90%;
 }
 
+.sub-header {
+  text-align: left;
+  font-family: futura;
+  padding-top: 2px;
+  font-size: 16px;
+  color: rgb(255, 255, 255);
+}
+
 .container b {
   margin: 5px;
   padding: 5px;
