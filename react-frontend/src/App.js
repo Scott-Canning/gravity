@@ -66,6 +66,7 @@ function App() {
     ethereum.request({ method: 'eth_requestAccounts' });
     provider = new ethers.providers.Web3Provider(ethereum);
     displayUserDetails();
+    //reconstructSchedule();
   } else {
     console.log("Please install MetaMask!");
   }
@@ -132,10 +133,10 @@ function App() {
   }
 
   async function withdrawSource() {
-    const parsedAmount = ethers.utils.parseUnits(withdrawTgtAmount.toString());
+    const parsedAmount = ethers.utils.parseUnits(withdrawSrcAmount.toString());
     const signer = await provider.getSigner();
     const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
-    const withdrawSource = await contractInstance.withdrawSource(tokenAddresses['DAI'], parsedAmount, {gasLimit: 750000});
+    const withdrawSource = await contractInstance.withdrawSource(tokenAddresses['DAI'], parsedAmount, {gasLimit: 25000000});
     //console.log("withdrawSource: ", withdrawSource);
   }
 
@@ -152,21 +153,15 @@ function App() {
     const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
     const readSchedule = await contractInstance.reconstructSchedule(signer.getAddress());
     const [ timestamps, purchaseAmounts ] = readSchedule;
-    console.log(readSchedule);
-    // let tempTimestamps = [];
-    // let tempPurchases = [];
+    //console.log(readSchedule);
     let tempSchedule = {};
 
     for(let i = 0; i < timestamps.length; i++) {
       let formattedTimestamp = timeConverter(ethers.utils.formatEther(timestamps[i]) * 1e18);
-      // tempTimestamps.push(formattedTimestamp);
-      // tempPurchases.push(ethers.utils.formatEther(purchaseAmounts[i]), 18);
-      tempSchedule[formattedTimestamp] = purchaseAmounts[i];
+      tempSchedule[formattedTimestamp] = ethers.utils.formatUnits(purchaseAmounts[i]);
     }
-    //console.log(tempSchedule);
     setPurchaseSchedule(tempSchedule);
-    // setScheduleTimestamps(tempTimestamps);
-    // setSchedulePurchases(tempPurchases);
+    console.log(purchaseSchedule);
   }
 
   function timeConverter(UNIX_timestamp){
@@ -193,17 +188,13 @@ function App() {
 
   return (
     <div className="App">
-      <div className="title">
-        Gravity
+      <div className="title" >
+      <a href={CONTRACT_URL} target="_blank" style={{ color: 'inherit', textDecoration: 'inherit'}}>Gravity</a>
       </div>
       <div className="container">
-        <h3 className="sub-title">Addresses</h3>
         <ul className="no-bullets">
           <li>
-            Contract: <a href={CONTRACT_URL} target="_blank">{GRAVITY}</a>
-          </li>
-          <li>
-            Account: {address}
+            Connected: {address}
           </li>
         </ul>
       </div>
@@ -299,9 +290,6 @@ function App() {
               );
               })
             }
-            {/* Object.entries(purchaseSchedule).forEach(([key, value]) => {
-              <p>key value</p>
-            }); */}
           </div>
           <div className="schedule-button">  
             <button onClick={reconstructSchedule}> Get Schedule </button>
