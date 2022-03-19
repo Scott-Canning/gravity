@@ -64,7 +64,7 @@ function App() {
     ethereum.request({ method: 'eth_requestAccounts' });
     provider = new ethers.providers.Web3Provider(ethereum);
     displayUserDetails();
-    //reconstructSchedule();
+    reconstructSchedule();
   } else {
     console.log("Please install MetaMask!");
   }
@@ -153,7 +153,7 @@ function App() {
       tempSchedule[formattedTimestamp] = ethers.utils.formatUnits(purchaseAmounts[i]);
     }
     setPurchaseSchedule(tempSchedule);
-    console.log(purchaseSchedule);
+    //console.log(purchaseSchedule);
   }
 
   function timeConverter(UNIX_timestamp){
@@ -269,14 +269,15 @@ function App() {
           </ul>
         </div>
         <div className ="strategy-details">
-          <div>
-            { Object.keys(purchaseSchedule).map((key, index) => { 
-              return (
-                  <p key={index}> {key} {purchaseSchedule[{key}]}</p>
-              );
-              })
-            }
-          </div>
+          <b>Deployment Schedule</b>
+            <div style={{paddingLeft: '10px'}}>
+              { Object.keys(purchaseSchedule).map((key) => { 
+                return (
+                    <p key={key}> {key} | Purchase amount: {purchaseSchedule[key]} DAI</p>
+                );
+                })
+              }
+            </div>
           <div className="schedule-button">  
             <button onClick={reconstructSchedule}> Get Schedule </button>
           </div>
