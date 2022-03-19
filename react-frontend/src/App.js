@@ -59,8 +59,6 @@ function App() {
     'WETH': wethJSON,
     'LINK': linkJSON
   };
-
-  //const ZEROS = '000000000000000000';
   
   if(ethereum) {
     ethereum.request({ method: 'eth_requestAccounts' });
@@ -82,7 +80,7 @@ function App() {
     const userDaiBalance = await daiContract.balanceOf(userAddress);
     setDaiBalance(ethers.utils.formatEther(userDaiBalance));
 
-    const wethContract = new ethers.Contract(WETH_KOVAN, linkJSON, signer);
+    const wethContract = new ethers.Contract(WETH_KOVAN, wethJSON, signer);
     const userWethBalance = await wethContract.balanceOf(userAddress);
     setWethBalance(ethers.utils.formatEther(userWethBalance));
 
@@ -96,7 +94,7 @@ function App() {
     // console.log(userAccount);
     const srcAsset = userAccount[1]
     setSrcAsset(tokenAddressesRev[srcAsset]);
-    const srcAssetBal = ethers.utils.formatUnits(userAccount[4]); //formatEther(userAccount[4]);
+    const srcAssetBal = ethers.utils.formatUnits(userAccount[4]);
     setSrcAssetBal(srcAssetBal);
     const tgtAsset = userAccount[2]
     setTgtAsset(tokenAddressesRev[tgtAsset]);
@@ -104,12 +102,6 @@ function App() {
     setTgtAssetBal(tgtAssetBal);
     const purchInterval = ethers.utils.formatUnits(userAccount[6].toString());
     setPurchInterval(purchInterval[19]);  // has to be a better way to parse this value;
-
-    // // display puchase orders
-    // const purchaseOrders = await contractInstance.purchaseOrders;
-    // const poCount = purchaseOrders.length;
-    // //console.log("PURCHASE ORDERS: ", purchaseOrders);
-    // setOrdersCount(poCount);
   }
 
   async function initiateNewStrategy() {
@@ -172,24 +164,18 @@ function App() {
     let date = a.getDate();
     let hour = a.getHours();
     let min =  a.getMinutes();
-    if(min.length > 1) {
+    if(min.length == 1) {
       min = "0" + min;
-      min = min.substring(-2);
+      //min = min.substring(-2);
     }
     let time = date + ' ' + month + ' ' + year + ' ' + hour + ':' + min;//.substring(-2);
     return time.toString();
   }
 
-  // format deposit and purchase amounts to have 18 zeros.
-  // async function formatZeros(_amount) {
-  //   const amount = _amount + ZEROS;
-  //   return(amount);
-  // }
-
   return (
     <div className="App">
       <div className="title" >
-      <a href={CONTRACT_URL} target="_blank" style={{ color: 'inherit', textDecoration: 'inherit'}}>Gravity</a>
+      <a href={CONTRACT_URL} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'inherit'}}>Gravity</a>
       </div>
       <div className="container">
         <ul className="no-bullets">
