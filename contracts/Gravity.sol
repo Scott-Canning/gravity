@@ -353,16 +353,27 @@ contract Gravity is KeeperCompatibleInterface {
         emit WithdrawnTarget(msg.sender, _amount);
     }
     
-    // [testing] temporary function to extract tokens
-    function empty() public {
-        require(msg.sender == owner);
+    // temporary function to extract tokens
+    function withdrawERC20(address _token, uint256 _amount) onlyOwner external {
+        require(IERC20(_token).balanceOf(address(this)) >= _amount, "Insufficient balance");
+        (bool success) = IERC20(_token).transfer(msg.sender, _amount);
+        require(success, "Withdrawal unsuccessful");
+    }
+
+    // temporary function to extract ETH
+    function withdrawETH() onlyOwner external {
         owner.transfer(address(this).balance);
     }
 
-    // [testing] temporary function to control upkeep
-    function toggleOnOff(bool _onOff) external {
+    // temporary function to manage Keeper
+    function toggleOnOff(bool _onOff) onlyOwner external {
         require(msg.sender == owner, "Owner only");
         onOff = _onOff;
+    }
+
+    modifier onlyOwner () {
+        require(msg.sender == owner, "Owner only");
+        _;
     }
 
     receive() external payable {}
