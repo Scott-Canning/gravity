@@ -7,14 +7,13 @@ import daiJSON from './utils/dai.json';
 import wethJSON from './utils/weth.json';
 import linkJSON from './utils/link.json';
 
-
 const GRAVITY = GRAVITY_KOVAN;
 const CONTRACT_URL = "https://kovan.etherscan.io/address/" + GRAVITY;
 
 function App() {
   const [address, setAddress] = React.useState("");
   const [balance, setBalance] = React.useState("");
-  
+
   // State variables for user erc20 balances.
   const [daiBalance, setDaiBalance] = React.useState("");
   const [linkBalance, setLinkBalance] = React.useState("");
@@ -23,21 +22,19 @@ function App() {
   const [depositAsset, setDepositAsset] = React.useState("");
   const [depositAmount, setDepositAmount] = React.useState("");
   const [purchaseAmount, setPurchaseAmount] = React.useState("");
+  const [purchaseAsset, setPurchaseAsset] = React.useState("");
   const [purchaseInterval, setPurchaseInterval] = React.useState("");
 
   // withdraw state
   const [withdrawSrcAmount, setWithdrawSrcAmount] = React.useState("");
   const [withdrawTgtAmount, setWithdrawTgtAmount] = React.useState("");
 
-  // State variables for user account details
-  //const [ordersCount, setOrdersCount] = React.useState("");
+  // user live strategy details
   const [srcAsset, setSrcAsset] = React.useState("");
   const [srcAssetBal, setSrcAssetBal] = React.useState("");
   const [tgtAsset, setTgtAsset] = React.useState("");
   const [tgtAssetBal, setTgtAssetBal] = React.useState("");
   const [purchInterval, setPurchInterval] = React.useState("");
-  // const [scheduleTimestamps, setScheduleTimestamps] = React.useState([]);
-  // const [schedulePurchases, setSchedulePurchases] = React.useState([]);
   const [purchaseSchedule, setPurchaseSchedule] = React.useState({});
 
   const { ethereum } = window;
@@ -64,7 +61,8 @@ function App() {
     ethereum.request({ method: 'eth_requestAccounts' });
     provider = new ethers.providers.Web3Provider(ethereum);
     displayUserDetails();
-    reconstructSchedule();
+    //reconstructSchedule();
+
   } else {
     console.log("Please install MetaMask!");
   }
@@ -105,6 +103,10 @@ function App() {
   }
 
   async function initiateNewStrategy() {
+    // setDepositAsset('DAI');
+    // setPurchaseAsset('WETH');
+    console.log("depositAsset: ", depositAsset);
+    console.log("purchaseAsset: ", purchaseAsset);
     const signer = await provider.getSigner();
     const tokenInstance = new ethers.Contract(tokenAddresses[depositAsset], contractJSONs[depositAsset], signer);
 
@@ -116,7 +118,7 @@ function App() {
 
     const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
     const initStrategy = await contractInstance.initiateNewStrategy(tokenAddresses[depositAsset], 
-                                                                    tokenAddresses['WETH'], 
+                                                                    tokenAddresses[purchaseAsset], 
                                                                     parsedDepositAmt,
                                                                     purchaseInterval,
                                                                     parsedPurchaseAmt,
@@ -128,7 +130,7 @@ function App() {
     const parsedAmount = ethers.utils.parseUnits(withdrawSrcAmount.toString());
     const signer = await provider.getSigner();
     const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
-    const withdrawSource = await contractInstance.withdrawSource(tokenAddresses['DAI'], parsedAmount, {gasLimit: 25000000});
+    const withdrawSource = await contractInstance.withdrawSource(tokenAddresses["DAI"], parsedAmount, {gasLimit: 25000000});
     //console.log("withdrawSource: ", withdrawSource);
   }
 
@@ -136,7 +138,7 @@ function App() {
     const parsedAmount = ethers.utils.parseUnits(withdrawTgtAmount.toString());
     const signer = await provider.getSigner();
     const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
-    const withdrawTarget = await contractInstance.withdrawTarget(tokenAddresses['WETH'], parsedAmount, {gasLimit: 350000});
+    const withdrawTarget = await contractInstance.withdrawTarget(tokenAddresses["WETH"], parsedAmount, {gasLimit: 350000});
     //console.log("withdrawTarget: ", withdrawTarget);
   }
 
@@ -149,28 +151,19 @@ function App() {
     let tempSchedule = {};
 
     for(let i = 0; i < timestamps.length; i++) {
-      let formattedTimestamp = timeConverter(ethers.utils.formatEther(timestamps[i]) * 1e18);
+      let formattedTimestamp = convertTimestamp(ethers.utils.formatEther(timestamps[i]) * 1e18);
       tempSchedule[formattedTimestamp] = ethers.utils.formatUnits(purchaseAmounts[i]);
     }
     setPurchaseSchedule(tempSchedule);
     //console.log(purchaseSchedule);
   }
 
-  function timeConverter(UNIX_timestamp){
-    let a = new Date(UNIX_timestamp * 1000);
-    let months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    let year = a.getFullYear();
-    let month = months[a.getMonth()];
-    let date = a.getDate();
-    let hour = a.getHours();
-    let min =  a.getMinutes();
-    if(min.length === 1) {
-      min = "0" + min;
-      //min = min.substring(-2);
-    }
-    let time = date + ' ' + month + ' ' + year + ' ' + hour + ':' + min;//.substring(-2);
-    return time.toString();
-  }
+  function convertTimestamp(timestamp) {
+    const milliseconds = timestamp * 1000
+    const dateObject = new Date(milliseconds);
+    const formatDate = dateObject.toLocaleString();
+    return formatDate;
+}
 
   return (
     <div className="App">
@@ -210,24 +203,34 @@ function App() {
         <div className="deposit">
           <b>Configure New DCA Strategy</b>
           <div className="input-row">
-            <label> Funding Asset: </label>
-            <input  value={depositAsset} onInput={e => setDepositAsset(e.target.value)}/>
+              <label> Funding Asset: </label>
+              <select selected={depositAsset} onChange={e => setDepositAsset(e.target.value)}>
+                <option value="" { ...depositAsset == '' ? 'selected="selected"' : '' }></option>
+                <option value="DAI" { ...depositAsset == 'DAI' ? 'selected="selected"' : '' }>DAI</option>
+              </select>
+          </div>
+          <div className="input-row">
+              <label> Purchase Asset: </label>
+              <select selected={purchaseAsset} onChange={e => setPurchaseAsset(e.target.value)}>
+                <option value="" { ...purchaseAsset == '' ? 'selected="selected"' : '' }></option>
+                <option value="WETH" { ...purchaseAsset == 'WETH' ? 'selected="selected"' : '' }>WETH</option>
+              </select>
           </div>
           <div className="input-row">
             <label> Funding Amount: </label>
             <input  value={depositAmount} onInput={e => setDepositAmount(e.target.value)}/>
           </div>
           <div className="input-row">
-            <label> Purchase Amount: </label>
-            <input  value={purchaseAmount} onInput={e => setPurchaseAmount(e.target.value)}/>
-          </div>
-          <div className="input-row">
             <label> Purchase Interval: </label>
             <input  value={purchaseInterval} onInput={e => setPurchaseInterval(e.target.value)}/>
           </div>
-            <div className="deposit-button">
-              <button onClick={initiateNewStrategy}> Initiate Strategy </button>
-            </div>
+          <div className="input-row">
+            <label> Purchase Amount Per Interval: </label>
+            <input  value={purchaseAmount} onInput={e => setPurchaseAmount(e.target.value)}/>
+          </div>
+          <div className="deposit-button">
+            <button onClick={initiateNewStrategy}> Initiate Strategy </button>
+          </div>
         </div>
         
         <div className="withdraw">
@@ -241,7 +244,7 @@ function App() {
           </div>
         </div>
         <div className="withdraw">
-          <b>Withdraw Target Asset</b>
+          <b>Withdraw Purchase Asset</b>
           <div className="input-row">     
             <label> Withdraw Amount: </label>
             <input value={withdrawTgtAmount} onInput={e => setWithdrawTgtAmount(e.target.value)}/>
@@ -271,20 +274,21 @@ function App() {
               Purchase Interval: {purchInterval}
             </li>
           </ul>
+          <div className="schedule-button">  
+            <button onClick={reconstructSchedule}> Get Schedule </button>
+          </div>
         </div>
         <div className ="strategy-details">
           <b>Deployment Schedule</b>
             <div style={{paddingLeft: '10px'}}>
               { Object.keys(purchaseSchedule).map((key) => { 
                 return (
-                    <p key={key}> {key} | Purchase amount: {purchaseSchedule[key]} DAI</p>
+                    <p key={key}> {key} | Purchase Amount: {purchaseSchedule[key]} DAI</p>
                 );
                 })
               }
             </div>
-          <div className="schedule-button">  
-            <button onClick={reconstructSchedule}> Get Schedule </button>
-          </div>
+
         </div>
       </div>
     </div>
