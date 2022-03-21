@@ -148,7 +148,8 @@ contract Gravity is KeeperCompatibleInterface {
         require(_sourceBalance > 0, "Insufficient deposit amount");
         require(_interval == 1 || _interval == 7 || _interval == 14 || _interval == 21 || _interval == 30, "Unsupported interval");
         
-        uint _accountStart = block.timestamp;
+        uint _now = block.timestamp;
+        uint _accountStart = _now - (_now % upKeepInterval) + (2 * upKeepInterval);
         uint _purchasesRemaining = _sourceBalance / _purchaseAmount;
         
         // handle remainder purchaseAmounts
@@ -162,8 +163,6 @@ contract Gravity is KeeperCompatibleInterface {
             _targetBalance += accounts[msg.sender].targetBalance;
         }
 
-        
-
         accounts[msg.sender] = Account(_accountStart, 
                                        _sourceAsset, 
                                        _targetAsset, 
@@ -176,10 +175,10 @@ contract Gravity is KeeperCompatibleInterface {
                                        );
 
         // populate purchaseOrders mapping
-        uint _unixNextSlot = _accountStart - (_accountStart % upKeepInterval) + 2 * upKeepInterval;
+        //uint _unixNextSlot = _accountStart - (_accountStart % upKeepInterval) + (2 * upKeepInterval);
         uint _unixInterval = _interval * upKeepInterval;
-        for(uint i = 0; i < _purchasesRemaining; i++) {
-            uint _nextUnixPurchaseDate = _unixNextSlot + (_unixInterval * i);
+        for(uint i = 1; i <= _purchasesRemaining; i++) {
+            uint _nextUnixPurchaseDate = _accountStart + (_unixInterval * i);
             if(accounts[msg.sender].sourceBalance >= accounts[msg.sender].purchaseAmount) {
                 purchaseOrders[_nextUnixPurchaseDate].push(PurchaseOrder(msg.sender, _purchaseAmount));
                 accounts[msg.sender].scheduledBalance += _purchaseAmount;
@@ -199,7 +198,7 @@ contract Gravity is KeeperCompatibleInterface {
     function checkUpkeep(bytes calldata /* checkData */) external override returns (bool upkeepNeeded, bytes memory /* performData */) {
         if((block.timestamp - lastTimeStamp) > upKeepInterval) {
             uint _now = block.timestamp;
-            uint _nextSlot = _now - (_now % upKeepInterval) + 2 * upKeepInterval;
+            uint _nextSlot = _now - (_now % upKeepInterval) + (2 * upKeepInterval);
             uint _toPurchase = accumulatePurchaseOrders(_nextSlot);
             if(_toPurchase > 0) {
                 upkeepNeeded = true;
@@ -233,7 +232,7 @@ contract Gravity is KeeperCompatibleInterface {
                     accounts[purchaseOrders[_nextSlot][i].user].purchasesRemaining -= 1;
                     accounts[purchaseOrders[_nextSlot][i].user].targetBalance += purchaseOrders[_nextSlot][i].purchaseAmount * _targetPurchased / _toPurchase;
                     if(accounts[purchaseOrders[_nextSlot][i].user].purchasesRemaining >= 1) {
-                        accounts[purchaseOrders[_nextSlot][i].user].accountStart = _nextSlot; // + (accounts[purchaseOrders[_nextSlot][i].user].interval * upKeepInterval);
+                        accounts[purchaseOrders[_nextSlot][i].user].accountStart = _nextSlot; // + (accounts[purchaseOrders[_nextSlot][i].user].interval * upKeepInterval);                   
                     }
                 }
                 
@@ -260,18 +259,16 @@ contract Gravity is KeeperCompatibleInterface {
         uint[] memory purchaseAmounts = new uint[](_purchasesRemaining);
 
         // reconstruct strategy's deployment schedule
-        uint _unixNextSlot = _accountStart - (_accountStart % upKeepInterval) + 2 * upKeepInterval;
+        //uint _unixNextSlot = _accountStart - (_accountStart % upKeepInterval) + (2 * upKeepInterval);
         uint _unixInterval = _interval * upKeepInterval;
-        for(uint i = 0; i < _purchasesRemaining; i++) {
-            uint _nextUnixPurchaseDate = _unixNextSlot + (_unixInterval * i);
-            timestamps[i] = _nextUnixPurchaseDate;
-            for(uint k = 0; k < purchaseOrders[timestamps[i]].length; k++){
-                if(purchaseOrders[timestamps[i]][k].user == _account){
-                    purchaseAmounts[i] = purchaseOrders[timestamps[i]][k].purchaseAmount;
-                    console.log("timestamps[i]", timestamps[i]);
-                    console.log("purchaseAmounts[i]", purchaseAmounts[i]);
+        for(uint i = 1; i <= _purchasesRemaining; i++) {
+            uint _nextUnixPurchaseDate = _accountStart + (_unixInterval * i);
+            timestamps[i-1] = _nextUnixPurchaseDate;
+            for(uint k = 0; k < purchaseOrders[timestamps[i-1]].length; k++){
+                if(purchaseOrders[timestamps[i-1]][k].user == _account){
+                    purchaseAmounts[i-1] = purchaseOrders[timestamps[i-1]][k].purchaseAmount;
+                    k = purchaseOrders[timestamps[i-1]].length;
                     console.log("k", k);
-                    k = purchaseOrders[timestamps[i]].length;
                 }
             }
         }
