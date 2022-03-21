@@ -141,6 +141,25 @@
   background-color: rgb(41, 44, 51);
 }
 
+.strategy-schedule {
+  float: left;
+  text-align: left;
+  font-size: 16px;
+  font-family: futura;
+  color: white;
+  width: 45%;
+  height: 215px;
+  padding: 10px;
+  margin: 10px;
+  position: relative;
+  border-color: black;
+  border-width: 0px;
+  border-radius: 10px;
+  border-style: solid;
+  background-color: rgb(41, 44, 51);
+  overflow-y: scroll; 
+}
+
 button {
   display: flex;
   font-size: 16px;
