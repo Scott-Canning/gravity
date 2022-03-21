@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@chainlink/contracts/src/v0.8/KeeperCompatible.sol";
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
+import 'hardhat/console.sol';
 
 interface CErc20 {
     function mint(uint256) external returns (uint256);
@@ -161,9 +162,9 @@ contract Gravity is KeeperCompatibleInterface {
             _targetBalance += accounts[msg.sender].targetBalance;
         }
 
-        uint _unixNextSlot = _accountStart - (_accountStart % upKeepInterval) + 2 * upKeepInterval;
+        
 
-        accounts[msg.sender] = Account(_unixNextSlot, 
+        accounts[msg.sender] = Account(_accountStart, 
                                        _sourceAsset, 
                                        _targetAsset, 
                                        _sourceBalance, 
@@ -175,6 +176,7 @@ contract Gravity is KeeperCompatibleInterface {
                                        );
 
         // populate purchaseOrders mapping
+        uint _unixNextSlot = _accountStart - (_accountStart % upKeepInterval) + 2 * upKeepInterval;
         uint _unixInterval = _interval * upKeepInterval;
         for(uint i = 0; i < _purchasesRemaining; i++) {
             uint _nextUnixPurchaseDate = _unixNextSlot + (_unixInterval * i);
@@ -188,7 +190,6 @@ contract Gravity is KeeperCompatibleInterface {
                 accounts[msg.sender].sourceBalance -= accounts[msg.sender].sourceBalance;
             }
         }
-
         depositSource(_sourceAsset, _sourceBalance);
         lendCompound(_sourceAsset, _sourceBalance / 2);
         emit NewStrategy(msg.sender);
@@ -232,7 +233,7 @@ contract Gravity is KeeperCompatibleInterface {
                     accounts[purchaseOrders[_nextSlot][i].user].purchasesRemaining -= 1;
                     accounts[purchaseOrders[_nextSlot][i].user].targetBalance += purchaseOrders[_nextSlot][i].purchaseAmount * _targetPurchased / _toPurchase;
                     if(accounts[purchaseOrders[_nextSlot][i].user].purchasesRemaining >= 1) {
-                        accounts[purchaseOrders[_nextSlot][i].user].accountStart = _nextSlot + (accounts[purchaseOrders[_nextSlot][i].user].interval * upKeepInterval);
+                        accounts[purchaseOrders[_nextSlot][i].user].accountStart = _nextSlot; // + (accounts[purchaseOrders[_nextSlot][i].user].interval * upKeepInterval);
                     }
                 }
                 
@@ -259,13 +260,17 @@ contract Gravity is KeeperCompatibleInterface {
         uint[] memory purchaseAmounts = new uint[](_purchasesRemaining);
 
         // reconstruct strategy's deployment schedule
+        uint _unixNextSlot = _accountStart - (_accountStart % upKeepInterval) + 2 * upKeepInterval;
         uint _unixInterval = _interval * upKeepInterval;
         for(uint i = 0; i < _purchasesRemaining; i++) {
-            uint _nextUnixPurchaseDate = _accountStart + (_unixInterval * i);
+            uint _nextUnixPurchaseDate = _unixNextSlot + (_unixInterval * i);
             timestamps[i] = _nextUnixPurchaseDate;
             for(uint k = 0; k < purchaseOrders[timestamps[i]].length; k++){
                 if(purchaseOrders[timestamps[i]][k].user == _account){
                     purchaseAmounts[i] = purchaseOrders[timestamps[i]][k].purchaseAmount;
+                    console.log("timestamps[i]", timestamps[i]);
+                    console.log("purchaseAmounts[i]", purchaseAmounts[i]);
+                    console.log("k", k);
                     k = purchaseOrders[timestamps[i]].length;
                 }
             }
