@@ -205,15 +205,15 @@ function App() {
           <div className="input-row">
               <label> Funding Asset: </label>
               <select selected={depositAsset} onChange={e => setDepositAsset(e.target.value)}>
-                <option value="" { ...depositAsset == '' ? 'selected="selected"' : '' }></option>
-                <option value="DAI" { ...depositAsset == 'DAI' ? 'selected="selected"' : '' }>DAI</option>
+                <option value="" { ...depositAsset === '' ? 'selected="selected"' : '' }></option>
+                <option value="DAI" { ...depositAsset === 'DAI' ? 'selected="selected"' : '' }>DAI</option>
               </select>
           </div>
           <div className="input-row">
               <label> Purchase Asset: </label>
               <select selected={purchaseAsset} onChange={e => setPurchaseAsset(e.target.value)}>
-                <option value="" { ...purchaseAsset == '' ? 'selected="selected"' : '' }></option>
-                <option value="WETH" { ...purchaseAsset == 'WETH' ? 'selected="selected"' : '' }>WETH</option>
+                <option value="" { ...purchaseAsset === '' ? 'selected="selected"' : '' }></option>
+                <option value="WETH" { ...purchaseAsset === 'WETH' ? 'selected="selected"' : '' }>WETH</option>
               </select>
           </div>
           <div className="input-row">

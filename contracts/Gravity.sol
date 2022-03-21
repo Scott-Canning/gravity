@@ -17,7 +17,7 @@ interface CErc20 {
 
 contract Gravity is KeeperCompatibleInterface {
     address payable owner;
-    bool public onOff = true;                                   // [testing] toggle Keeper on/off
+    bool public onOff = true;                                   // manage toggle Keeper
     uint public immutable upKeepInterval;
     uint public lastTimeStamp;
 
@@ -65,18 +65,8 @@ contract Gravity is KeeperCompatibleInterface {
         upKeepInterval = _upKeepInterval;
         lastTimeStamp = block.timestamp;
         
-        // for testing
-        sourceTokens[address(_sourceToken)] = true; // TestToken (testing only)
+        sourceTokens[address(_sourceToken)] = true;
         targetTokens[address(_targetToken)] = true;
-
-        // interchanged target and Source to test withdrawals
-        targetTokens[address(_sourceToken)] = true; 
-        sourceTokens[address(_targetToken)] = true;
-
-        // load asset Kovan addresses into tokenAddress mapping
-        // sourceTokens[address(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa)] = true; // DAI
-        // sourceTokens[address(0xd0A1E359811322d97991E03f863a0C30C2cF029C)] = true; // WETH
-        // sourceTokens[address(0xa36085F69e2889c224210F603D836748e7dC0088)] = true; // LINK
     }
 
 
@@ -84,8 +74,8 @@ contract Gravity is KeeperCompatibleInterface {
         // approve router to spend tokenIn
         TransferHelper.safeApprove(_tokenIn, address(swapRouter), _amountIn);
 
-        // naively set amountOutMinimum to 0. In production, use an oracle or other data source to choose a safer value for amountOutMinimum.
-        // We also set the sqrtPriceLimitx96 to be 0 to ensure we swap our exact input amount.
+        // naively set amountOutMinimum to 0. In production, use an oracle or other data source to choose a safer value for amountOutMinimum
+        // set sqrtPriceLimitx96 to be 0 to ensure we swap our exact input amount.
         ISwapRouter.ExactInputSingleParams memory params =
             ISwapRouter.ExactInputSingleParams({
                 tokenIn: _tokenIn,
@@ -98,7 +88,7 @@ contract Gravity is KeeperCompatibleInterface {
                 sqrtPriceLimitX96: 0
             });
 
-        // call to `exactInputSingle` executes the swap.
+        // execute the swap
         amountOut = swapRouter.exactInputSingle(params);
     }
     
@@ -198,7 +188,6 @@ contract Gravity is KeeperCompatibleInterface {
             }
         }
 
-        // [testing] compound lend
         depositSource(_sourceAsset, _sourceBalance);
         lendCompound(_sourceAsset, _sourceBalance / 2);
         emit NewStrategy(msg.sender);
@@ -226,7 +215,7 @@ contract Gravity is KeeperCompatibleInterface {
             lastTimeStamp = block.timestamp;
             if (_toPurchase > 0) {
 
-                // [testing] compound redeem
+                // compound redeem
                 if(_toPurchase > IERC20(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa).balanceOf(address(this))) {
                     redeemCompound(_toPurchase - IERC20(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa).balanceOf(address(this)));
                 }
@@ -353,19 +342,19 @@ contract Gravity is KeeperCompatibleInterface {
         emit WithdrawnTarget(msg.sender, _amount);
     }
     
-    // temporary function to extract tokens
+    // temporary demo function to extract tokens
     function withdrawERC20(address _token, uint256 _amount) onlyOwner external {
         require(IERC20(_token).balanceOf(address(this)) >= _amount, "Insufficient balance");
         (bool success) = IERC20(_token).transfer(msg.sender, _amount);
         require(success, "Withdrawal unsuccessful");
     }
 
-    // temporary function to extract ETH
+    // temporary demo function to extract ETH
     function withdrawETH() onlyOwner external {
         owner.transfer(address(this).balance);
     }
 
-    // temporary function to manage Keeper
+    // temporary demo function to manage Keeper
     function toggleOnOff(bool _onOff) onlyOwner external {
         require(msg.sender == owner, "Owner only");
         onOff = _onOff;
