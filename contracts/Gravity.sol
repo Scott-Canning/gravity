@@ -161,7 +161,9 @@ contract Gravity is KeeperCompatibleInterface {
             _targetBalance += accounts[msg.sender].targetBalance;
         }
 
-        accounts[msg.sender] = Account(_accountStart, 
+        uint _unixNextSlot = _accountStart - (_accountStart % upKeepInterval) + 2 * upKeepInterval;
+
+        accounts[msg.sender] = Account(_unixNextSlot, 
                                        _sourceAsset, 
                                        _targetAsset, 
                                        _sourceBalance, 
@@ -173,9 +175,8 @@ contract Gravity is KeeperCompatibleInterface {
                                        );
 
         // populate purchaseOrders mapping
-        uint _unixNextSlot = _accountStart - (_accountStart % upKeepInterval) + 2 * upKeepInterval;
         uint _unixInterval = _interval * upKeepInterval;
-        for(uint i = 1; i <= _purchasesRemaining; i++) {
+        for(uint i = 0; i < _purchasesRemaining; i++) {
             uint _nextUnixPurchaseDate = _unixNextSlot + (_unixInterval * i);
             if(accounts[msg.sender].sourceBalance >= accounts[msg.sender].purchaseAmount) {
                 purchaseOrders[_nextUnixPurchaseDate].push(PurchaseOrder(msg.sender, _purchaseAmount));
@@ -230,7 +231,9 @@ contract Gravity is KeeperCompatibleInterface {
                     accounts[purchaseOrders[_nextSlot][i].user].scheduledBalance -= purchaseOrders[_nextSlot][i].purchaseAmount;
                     accounts[purchaseOrders[_nextSlot][i].user].purchasesRemaining -= 1;
                     accounts[purchaseOrders[_nextSlot][i].user].targetBalance += purchaseOrders[_nextSlot][i].purchaseAmount * _targetPurchased / _toPurchase;
+                    accounts[purchaseOrders[_nextSlot][i].user].accountStart = _nextSlot + (accounts[purchaseOrders[_nextSlot][i].user].interval * upKeepInterval);
                 }
+                
                 // delete purchaseOrder post swap
                 delete purchaseOrders[_nextSlot];
                 emit PurchaseExecuted(_nextSlot, _targetPurchased);
@@ -254,16 +257,15 @@ contract Gravity is KeeperCompatibleInterface {
         uint[] memory purchaseAmounts = new uint[](_purchasesRemaining);
 
         // reconstruct strategy's deployment schedule
-        uint _unixNextTwoMinSlot = _accountStart - (_accountStart % upKeepInterval) + 2 * upKeepInterval;
         uint _unixInterval = _interval * upKeepInterval;
-        for(uint i = 1; i <= _purchasesRemaining; i++) {
-            uint _nextUnixPurchaseDate = _unixNextTwoMinSlot + (_unixInterval * i);
-            timestamps[i - 1] = _nextUnixPurchaseDate;
-            if(_scheduledBalance >= _purchaseAmount) {
-                purchaseAmounts[i - 1] = _purchaseAmount;
-                _scheduledBalance -= _purchaseAmount;
-            } else { // handles remainder purchase amount
-                purchaseAmounts[i - 1] = _scheduledBalance;
+        for(uint i = 0; i < _purchasesRemaining; i++) {
+            uint _nextUnixPurchaseDate = _accountStart + (_unixInterval * i);
+            timestamps[i] = _nextUnixPurchaseDate;
+            for(uint k = 0; k < purchaseOrders[timestamps[i]].length; k++){
+                if(purchaseOrders[timestamps[i]][k].user == _account){
+                    purchaseAmounts[i] = purchaseOrders[timestamps[i]][k].purchaseAmount;
+                    k = purchaseOrders[timestamps[i]].length;
+                }
             }
         }
         return(timestamps, purchaseAmounts);

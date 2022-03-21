@@ -89,12 +89,12 @@ function App() {
     // account strategy information
     const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
     const userAccount = await contractInstance.accounts(userAddress);
-    // console.log(userAccount);
-    const srcAsset = userAccount[1]
+    console.log(userAccount);
+    const srcAsset = userAccount[1];
     setSrcAsset(tokenAddressesRev[srcAsset]);
     const srcAssetBal = ethers.utils.formatUnits(userAccount[4]);
     setSrcAssetBal(srcAssetBal);
-    const tgtAsset = userAccount[2]
+    const tgtAsset = userAccount[2];
     setTgtAsset(tokenAddressesRev[tgtAsset]);
     const tgtAssetBal = ethers.utils.formatEther(userAccount[5]);
     setTgtAssetBal(tgtAssetBal);
@@ -232,7 +232,6 @@ function App() {
             <button onClick={initiateNewStrategy}> Initiate Strategy </button>
           </div>
         </div>
-        
         <div className="withdraw">
           <b>Withdraw Funding Asset</b>
           <div className="input-row">     
@@ -278,7 +277,7 @@ function App() {
             <button onClick={reconstructSchedule}> Get Schedule </button>
           </div>
         </div>
-        <div className ="strategy-details">
+        <div className ="strategy-schedule">
           <b>Deployment Schedule</b>
             <div style={{paddingLeft: '10px'}}>
               { Object.keys(purchaseSchedule).map((key) => { 
