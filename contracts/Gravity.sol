@@ -231,7 +231,9 @@ contract Gravity is KeeperCompatibleInterface {
                     accounts[purchaseOrders[_nextSlot][i].user].scheduledBalance -= purchaseOrders[_nextSlot][i].purchaseAmount;
                     accounts[purchaseOrders[_nextSlot][i].user].purchasesRemaining -= 1;
                     accounts[purchaseOrders[_nextSlot][i].user].targetBalance += purchaseOrders[_nextSlot][i].purchaseAmount * _targetPurchased / _toPurchase;
-                    accounts[purchaseOrders[_nextSlot][i].user].accountStart = _nextSlot + (accounts[purchaseOrders[_nextSlot][i].user].interval * upKeepInterval);
+                    if(accounts[purchaseOrders[_nextSlot][i].user].purchasesRemaining >= 1) {
+                        accounts[purchaseOrders[_nextSlot][i].user].accountStart = _nextSlot + (accounts[purchaseOrders[_nextSlot][i].user].interval * upKeepInterval);
+                    }
                 }
                 
                 // delete purchaseOrder post swap
