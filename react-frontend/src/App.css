@@ -94,7 +94,7 @@
   font-family: futura;
   color: white;
   width: 45%;
-  height: 255px;
+  height: 260px;
   padding: 10px;
   margin: 10px;
   position: relative;
@@ -194,7 +194,8 @@ button:active{background-color:rgb(255, 255, 255);}
   float: right;
   text-align: right;
   font-size: 16px;
-  width: 40%;
+  padding-right: 14px;
+  width: 30%;
   -webkit-box-sizing: border-box;
   -moz-box-sizing: border-box;
        box-sizing: border-box;
@@ -202,9 +203,10 @@ button:active{background-color:rgb(255, 255, 255);}
 
 .input-row select {
   float: right;
-  text-align: center;
+  text-align: right;
   font-size: 16px;
-  width: 20%;
+  height: 24.5px;
+  width: 30%;
   -webkit-box-sizing: border-box;
   -moz-box-sizing: border-box;
        box-sizing: border-box;

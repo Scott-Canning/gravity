@@ -103,10 +103,9 @@ function App() {
   }
 
   async function initiateNewStrategy() {
-    // setDepositAsset('DAI');
-    // setPurchaseAsset('WETH');
     console.log("depositAsset: ", depositAsset);
     console.log("purchaseAsset: ", purchaseAsset);
+    console.log("purchaseInterval", purchaseInterval);
     const signer = await provider.getSigner();
     const tokenInstance = new ethers.Contract(tokenAddresses[depositAsset], contractJSONs[depositAsset], signer);
 
@@ -120,7 +119,7 @@ function App() {
     const initStrategy = await contractInstance.initiateNewStrategy(tokenAddresses[depositAsset], 
                                                                     tokenAddresses[purchaseAsset], 
                                                                     parsedDepositAmt,
-                                                                    purchaseInterval,
+                                                                    parseInt(purchaseInterval),
                                                                     parsedPurchaseAmt,
                                                                     {gasLimit: 1500000});
     // console.log("initiateNewStrategy: ", initStrategy);
@@ -222,7 +221,15 @@ function App() {
           </div>
           <div className="input-row">
             <label> Purchase Interval: </label>
-            <input  value={purchaseInterval} onInput={e => setPurchaseInterval(e.target.value)}/>
+              <select selected={purchaseInterval} onChange={e => setPurchaseInterval(e.target.value)}>
+                <option value="" { ...purchaseInterval === '' ? 'selected="selected"' : '' }></option>
+                <option value="1" { ...purchaseInterval === '1' ? 'selected="selected"' : '' }>1</option>
+                <option value="7" { ...purchaseInterval === '7' ? 'selected="selected"' : '' }>7</option>
+                <option value="14" { ...purchaseInterval === '14' ? 'selected="selected"' : '' }>14</option>
+                <option value="21" { ...purchaseInterval === '21' ? 'selected="selected"' : '' }>21</option>
+                <option value="30" { ...purchaseInterval === '30' ? 'selected="selected"' : '' }>30</option>
+              </select>
+            {/* <input  value={purchaseInterval} onInput={e => setPurchaseInterval(e.target.value)}/> */}
           </div>
           <div className="input-row">
             <label> Purchase Amount Per Interval: </label>
