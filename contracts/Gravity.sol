@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@chainlink/contracts/src/v0.8/KeeperCompatible.sol";
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
-import 'hardhat/console.sol';
 
 interface CErc20 {
     function mint(uint256) external returns (uint256);
@@ -65,7 +64,6 @@ contract Gravity is KeeperCompatibleInterface {
         // keeper variables (in seconds)
         upKeepInterval = _upKeepInterval;
         lastTimeStamp = block.timestamp;
-        
         sourceTokens[address(_sourceToken)] = true;
         targetTokens[address(_targetToken)] = true;
     }
@@ -175,7 +173,6 @@ contract Gravity is KeeperCompatibleInterface {
                                        );
 
         // populate purchaseOrders mapping
-        //uint _unixNextSlot = _accountStart - (_accountStart % upKeepInterval) + (2 * upKeepInterval);
         uint _unixInterval = _interval * upKeepInterval;
         for(uint i = 1; i <= _purchasesRemaining; i++) {
             uint _nextUnixPurchaseDate = _accountStart + (_unixInterval * i);
@@ -231,9 +228,7 @@ contract Gravity is KeeperCompatibleInterface {
                     accounts[purchaseOrders[_nextSlot][i].user].scheduledBalance -= purchaseOrders[_nextSlot][i].purchaseAmount;
                     accounts[purchaseOrders[_nextSlot][i].user].purchasesRemaining -= 1;
                     accounts[purchaseOrders[_nextSlot][i].user].targetBalance += purchaseOrders[_nextSlot][i].purchaseAmount * _targetPurchased / _toPurchase;
-                    if(accounts[purchaseOrders[_nextSlot][i].user].purchasesRemaining >= 1) {
-                        accounts[purchaseOrders[_nextSlot][i].user].accountStart = _nextSlot; // + (accounts[purchaseOrders[_nextSlot][i].user].interval * upKeepInterval);                   
-                    }
+                    accounts[purchaseOrders[_nextSlot][i].user].accountStart = _nextSlot;
                 }
                 
                 // delete purchaseOrder post swap
@@ -259,8 +254,17 @@ contract Gravity is KeeperCompatibleInterface {
         uint[] memory purchaseAmounts = new uint[](_purchasesRemaining);
 
         // reconstruct strategy's deployment schedule
-        //uint _unixNextSlot = _accountStart - (_accountStart % upKeepInterval) + (2 * upKeepInterval);
         uint _unixInterval = _interval * upKeepInterval;
+        if(_purchasesRemaining == 1) {
+            timestamps[0] = _accountStart + _unixInterval;
+            for(uint i = 0; i < purchaseOrders[timestamps[0]].length; i++){
+                if(purchaseOrders[timestamps[0]][i].user == _account)
+                purchaseAmounts[0] = purchaseOrders[timestamps[0]][i].purchaseAmount;
+                i = purchaseOrders[timestamps[0]].length;
+            }
+            return(timestamps, purchaseAmounts);
+        }
+
         for(uint i = 1; i <= _purchasesRemaining; i++) {
             uint _nextUnixPurchaseDate = _accountStart + (_unixInterval * i);
             timestamps[i-1] = _nextUnixPurchaseDate;
@@ -268,7 +272,6 @@ contract Gravity is KeeperCompatibleInterface {
                 if(purchaseOrders[timestamps[i-1]][k].user == _account){
                     purchaseAmounts[i-1] = purchaseOrders[timestamps[i-1]][k].purchaseAmount;
                     k = purchaseOrders[timestamps[i-1]].length;
-                    console.log("k", k);
                 }
             }
         }
