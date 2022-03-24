@@ -185,9 +185,7 @@ contract Gravity is KeeperCompatibleInterface {
             }
         }
         depositSource(_sourceAsset, _sourceBalance);
-        // [LOCAL TESTING]
-        //lendCompound(_sourceAsset, _sourceBalance / 2);
-        // [LOCAL TESTING]
+        lendCompound(_sourceAsset, _sourceBalance / 2); // [COMMENT FOR LOCAL TESTING]
         emit NewStrategy(block.timestamp, _accountStart, msg.sender);
     }
 
@@ -213,11 +211,10 @@ contract Gravity is KeeperCompatibleInterface {
 
             if (_toPurchase > 0) {
                 // compound redeem
-                // [LOCAL TESTING]
+                // [COMMENT FOR LOCAL TESTING]
                 if(_toPurchase > IERC20(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa).balanceOf(address(this))) {
                     redeemCompound(_toPurchase - IERC20(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa).balanceOf(address(this)));
                 }
-                // [LOCAL TESTING]
 
                 uint256 _targetPurchased = swap(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa, 
                                                 0xd0A1E359811322d97991E03f863a0C30C2cF029C,
@@ -322,11 +319,10 @@ contract Gravity is KeeperCompatibleInterface {
         }
 
         // if treasury cannot cover, redeem
-        // [LOCAL TESTING]
+        // [COMMENT FOR LOCAL TESTING]
         if(_amount > IERC20(_token).balanceOf(address(this))){
            redeemCompound(_amount - IERC20(_token).balanceOf(address(this)));
         }
-        // [LOCAL TESTING]
 
         accounts[msg.sender].scheduledBalance -= _amount;
         (bool success) = IERC20(_token).transfer(msg.sender, _amount);
