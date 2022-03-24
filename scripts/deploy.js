@@ -4,6 +4,7 @@ require('dotenv').config();
 
 const sourceToken = '0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa'; // DAI
 const targetToken = '0xd0A1E359811322d97991E03f863a0C30C2cF029C'; // WETH
+const interval = 120;
 
 async function deploy() {
   const url = process.env.KOVAN_URL;
@@ -14,7 +15,7 @@ async function deploy() {
 
   let artifacts = await hre.artifacts.readArtifact("Gravity");
   let factory = new ethers.ContractFactory(artifacts.abi, artifacts.bytecode, wallet);
-  let contract = await factory.deploy(sourceToken, targetToken, 120); // 30 is to test initial integration
+  let contract = await factory.deploy(sourceToken, targetToken, interval);
 
   console.log("Contract address:", contract.address);
   await contract.deployed();

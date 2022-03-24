@@ -145,13 +145,12 @@ function App() {
     const signer = await provider.getSigner();
     const contractInstance = new ethers.Contract(GRAVITY, gravityJSON, signer);
     const readSchedule = await contractInstance.reconstructSchedule(signer.getAddress());
-    const [ timestamps, purchaseAmounts ] = readSchedule;
+    const [ purchaseSlot, purchaseAmounts ] = readSchedule;
     //console.log(readSchedule);
     let tempSchedule = {};
 
-    for(let i = 0; i < timestamps.length; i++) {
-      let formattedTimestamp = convertTimestamp(ethers.utils.formatEther(timestamps[i]) * 1e18);
-      tempSchedule[formattedTimestamp] = ethers.utils.formatUnits(purchaseAmounts[i]);
+    for(let i = 0; i < purchaseSlot.length; i++) {
+      tempSchedule[purchaseSlot[i]] = ethers.utils.formatUnits(purchaseAmounts[i]);
     }
     setPurchaseSchedule(tempSchedule);
     //console.log(purchaseSchedule);
@@ -229,7 +228,6 @@ function App() {
                 <option value="21" { ...purchaseInterval === '21' ? 'selected="selected"' : '' }>21</option>
                 <option value="30" { ...purchaseInterval === '30' ? 'selected="selected"' : '' }>30</option>
               </select>
-            {/* <input  value={purchaseInterval} onInput={e => setPurchaseInterval(e.target.value)}/> */}
           </div>
           <div className="input-row">
             <label> Purchase Amount Per Interval: </label>
@@ -294,7 +292,6 @@ function App() {
                 })
               }
             </div>
-
         </div>
       </div>
     </div>
