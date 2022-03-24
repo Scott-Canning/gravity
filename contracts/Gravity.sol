@@ -185,7 +185,8 @@ contract Gravity is KeeperCompatibleInterface {
             }
         }
         depositSource(_sourceAsset, _sourceBalance);
-        lendCompound(_sourceAsset, _sourceBalance / 2); // [COMMENT FOR LOCAL TESTING]
+        // [COMMENT FOR LOCAL TESTING]
+        lendCompound(_sourceAsset, _sourceBalance / 2); 
         emit NewStrategy(block.timestamp, _accountStart, msg.sender);
     }
 

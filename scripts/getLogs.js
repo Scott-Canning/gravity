@@ -5,7 +5,7 @@ require('dotenv').config();
 async function main() {
     const url = process.env.KOVAN_URL;
     const provider = new ethers.providers.JsonRpcProvider(url);
-    const contractAddress = "0x4Ca9C14d4Ca0CA5114fF4af8677d9BBCE8b49792";
+    const contractAddress = "0xE00EbC95b879C86EAC3866f31fb66eD3D32fc4e1";
     let iface = new ethers.utils.Interface(abi);
     console.log('Pulling logs for ' + contractAddress + '...')
 
