@@ -7,6 +7,7 @@ import "@chainlink/contracts/src/v0.8/KeeperCompatible.sol";
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 
+
 interface CErc20 {
     function mint(uint256) external returns (uint256);
     function exchangeRateCurrent() external returns (uint256);
@@ -20,6 +21,7 @@ contract Gravity is KeeperCompatibleInterface {
     bool public onOff = true;                                   // manage toggle Keeper
     uint public immutable upKeepInterval;
     uint public lastTimeStamp;
+    uint public purchaseSlot;
 
     uint24 public constant poolFee = 3000;                      // pool fee set to 0.3%
     ISwapRouter public immutable swapRouter = 
@@ -27,18 +29,18 @@ contract Gravity is KeeperCompatibleInterface {
     uint public amountLent;                                     // DAI lent on Compound
 
     mapping (address => Account) public accounts;               // user address => user Account
+    mapping (uint => PurchaseOrder[]) public purchaseOrders;    // purchaseSlot => purchaseOrders
     mapping (address => bool) public sourceTokens;              // mapping for supported tokens
     mapping (address => bool) public targetTokens;              // mapping for supported tokens
-    mapping (uint => PurchaseOrder[]) public purchaseOrders;
 
-    event NewStrategy(address);
-    event PurchaseExecuted(uint timestamp, uint targetPurchased);
-    event PerformUpkeepFailed(uint timestamp);
-    event Deposited(address from, uint256 sourceDeposited);
-    event WithdrawnTarget(address to, uint256 targetWithdrawn);
-    event WithdrawnSource(address to, uint256 sourceWithdrawn);
-    event LentDAI(uint256 exchangeRate, uint256 supplyRate);
-    event RedeemedDAI(uint256 redeemResult);
+    event NewStrategy(uint blockTimestamp, uint accountStart, address account);
+    event PerformUpkeepSucceeded(uint now, uint purchaseSlot, uint targetPurchased);
+    event PerformUpkeepFailed(uint now, uint purchaseSlot, uint toPurchase);
+    event Deposited(uint timestamp, address from, uint256 sourceDeposited);
+    event WithdrawnSource(uint timestamp, address to, uint256 sourceWithdrawn);
+    event WithdrawnTarget(uint timestamp, address to, uint256 targetWithdrawn);
+    event LentDAI(uint timestamp, uint256 exchangeRate, uint256 supplyRate);
+    event RedeemedDAI(uint timestamp, uint256 redeemResult);
 
     struct Account {
         uint            accountStart;
@@ -54,8 +56,8 @@ contract Gravity is KeeperCompatibleInterface {
 
 
     struct PurchaseOrder {
-        address user;
-        uint    purchaseAmount;
+        address         user;
+        uint            purchaseAmount;
     }
 
 
@@ -104,12 +106,11 @@ contract Gravity is KeeperCompatibleInterface {
 
         // approve transfer on the ERC20 contract
         IERC20(_tokenIn).approve(0xF0d0EB522cfa50B716B3b1604C4F0fA6f04376AD, _lendAmount);
-
         amountLent += _lendAmount;
 
         // mint cTokens
         uint mintResult = cToken.mint(_lendAmount);
-        emit LentDAI(exchangeRate, supplyRate);
+        emit LentDAI(block.timestamp, exchangeRate, supplyRate);
         return mintResult;
     }
 
@@ -120,20 +121,19 @@ contract Gravity is KeeperCompatibleInterface {
     
         // retrieve asset based on an amount of the asset
         uint256 redeemResult;
-
         amountLent -= _redeemAmount;
 
         // redeem underlying
         redeemResult = cToken.redeemUnderlying(_redeemAmount);
-        emit RedeemedDAI(redeemResult);
+        emit RedeemedDAI(block.timestamp, redeemResult);
         return true;
     }
 
     // [accelerated demo version]
-    function accumulatePurchaseOrders(uint _timestamp) public view returns (uint) {
+    function accumulatePurchaseOrders(uint _purchaseSlot) public view returns (uint) {
         uint _total;
-        for(uint i = 0; i < purchaseOrders[_timestamp].length; i++) {
-            _total += purchaseOrders[_timestamp][i].purchaseAmount;
+        for(uint i = 0; i < purchaseOrders[_purchaseSlot].length; i++) {
+            _total += purchaseOrders[_purchaseSlot][i].purchaseAmount;
         }
         return _total;
     }
@@ -146,8 +146,7 @@ contract Gravity is KeeperCompatibleInterface {
         require(_sourceBalance > 0, "Insufficient deposit amount");
         require(_interval == 1 || _interval == 7 || _interval == 14 || _interval == 21 || _interval == 30, "Unsupported interval");
         
-        uint _now = block.timestamp;
-        uint _accountStart = _now - (_now % upKeepInterval) + (2 * upKeepInterval);
+        uint _accountStart = purchaseSlot;
         uint _purchasesRemaining = _sourceBalance / _purchaseAmount;
         
         // handle remainder purchaseAmounts
@@ -155,7 +154,7 @@ contract Gravity is KeeperCompatibleInterface {
             _purchasesRemaining += 1;
         }
 
-        // naive target balance carry over if existing user initiates new strategy
+        // target balance carry over if existing user initiates new strategy
         uint _targetBalance = 0;
         if(accounts[msg.sender].targetBalance > 0){
             _targetBalance += accounts[msg.sender].targetBalance;
@@ -173,30 +172,31 @@ contract Gravity is KeeperCompatibleInterface {
                                        );
 
         // populate purchaseOrders mapping
-        uint _unixInterval = _interval * upKeepInterval;
-        for(uint i = 1; i <= _purchasesRemaining; i++) {
-            uint _nextUnixPurchaseDate = _accountStart + (_unixInterval * i);
+        for(uint i = 0; i < _purchasesRemaining; i++) {
+            uint _purchaseSlot = _accountStart + (_interval * i);
             if(accounts[msg.sender].sourceBalance >= accounts[msg.sender].purchaseAmount) {
-                purchaseOrders[_nextUnixPurchaseDate].push(PurchaseOrder(msg.sender, _purchaseAmount));
+                purchaseOrders[_purchaseSlot].push(PurchaseOrder(msg.sender, _purchaseAmount));
                 accounts[msg.sender].scheduledBalance += _purchaseAmount;
                 accounts[msg.sender].sourceBalance -= _purchaseAmount;
             } else { // handles remainder purchase amount
-                purchaseOrders[_nextUnixPurchaseDate].push(PurchaseOrder(msg.sender, accounts[msg.sender].sourceBalance));
+                purchaseOrders[_purchaseSlot].push(PurchaseOrder(msg.sender, accounts[msg.sender].sourceBalance));
                 accounts[msg.sender].scheduledBalance += accounts[msg.sender].sourceBalance;
                 accounts[msg.sender].sourceBalance -= accounts[msg.sender].sourceBalance;
             }
         }
         depositSource(_sourceAsset, _sourceBalance);
-        lendCompound(_sourceAsset, _sourceBalance / 2);
-        emit NewStrategy(msg.sender);
+        // [LOCAL TESTING]
+        //lendCompound(_sourceAsset, _sourceBalance / 2);
+        // [LOCAL TESTING]
+        emit NewStrategy(block.timestamp, _accountStart, msg.sender);
     }
 
     // [accelerated demo version]
-    function checkUpkeep(bytes calldata /* checkData */) external override returns (bool upkeepNeeded, bytes memory /* performData */) {
-        if((block.timestamp - lastTimeStamp) > upKeepInterval) {
-            uint _now = block.timestamp;
-            uint _nextSlot = _now - (_now % upKeepInterval) + (2 * upKeepInterval);
-            uint _toPurchase = accumulatePurchaseOrders(_nextSlot);
+    function checkUpkeep(bytes calldata /* checkData */) external view override returns (bool upkeepNeeded, bytes memory /* performData */) {
+        uint _now = block.timestamp;
+        if((_now - lastTimeStamp) > upKeepInterval) {
+            uint _toPurchase = accumulatePurchaseOrders(purchaseSlot);
+            
             if(_toPurchase > 0) {
                 upkeepNeeded = true;
             }
@@ -206,17 +206,18 @@ contract Gravity is KeeperCompatibleInterface {
     // [accelerated demo version]
     function performUpkeep(bytes calldata /* performData */) external override {
         uint _now = block.timestamp;
-        uint _nextSlot = _now - (_now % upKeepInterval) + 2 * upKeepInterval;
-        uint _toPurchase = accumulatePurchaseOrders(_nextSlot);
-        // revalidate checkUpkeep condition
-        if((block.timestamp - lastTimeStamp) > upKeepInterval) {
-            lastTimeStamp = block.timestamp;
-            if (_toPurchase > 0) {
+        // revalidate two conditions
+        if((_now - lastTimeStamp) > upKeepInterval) { 
+            uint _toPurchase = accumulatePurchaseOrders(purchaseSlot);
+            lastTimeStamp = _now;
 
+            if (_toPurchase > 0) {
                 // compound redeem
+                // [LOCAL TESTING]
                 if(_toPurchase > IERC20(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa).balanceOf(address(this))) {
                     redeemCompound(_toPurchase - IERC20(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa).balanceOf(address(this)));
                 }
+                // [LOCAL TESTING]
 
                 uint256 _targetPurchased = swap(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa, 
                                                 0xd0A1E359811322d97991E03f863a0C30C2cF029C,
@@ -224,58 +225,49 @@ contract Gravity is KeeperCompatibleInterface {
                                                 0);
 
                 // update each account's scheduledBalance, targetBalance, and purchasesRemaining
-                for(uint i = 0; i < purchaseOrders[_nextSlot].length; i++) {
-                    accounts[purchaseOrders[_nextSlot][i].user].scheduledBalance -= purchaseOrders[_nextSlot][i].purchaseAmount;
-                    accounts[purchaseOrders[_nextSlot][i].user].purchasesRemaining -= 1;
-                    accounts[purchaseOrders[_nextSlot][i].user].targetBalance += purchaseOrders[_nextSlot][i].purchaseAmount * _targetPurchased / _toPurchase;
-                    accounts[purchaseOrders[_nextSlot][i].user].accountStart = _nextSlot;
+                for(uint i = 0; i < purchaseOrders[purchaseSlot].length; i++) {
+                    accounts[purchaseOrders[purchaseSlot][i].user].scheduledBalance -= purchaseOrders[purchaseSlot][i].purchaseAmount;
+                    accounts[purchaseOrders[purchaseSlot][i].user].purchasesRemaining -= 1;
+                    accounts[purchaseOrders[purchaseSlot][i].user].targetBalance += purchaseOrders[purchaseSlot][i].purchaseAmount * _targetPurchased / _toPurchase;
+                    accounts[purchaseOrders[purchaseSlot][i].user].accountStart = (purchaseSlot + accounts[purchaseOrders[purchaseSlot][i].user].interval);
+                    if(accounts[purchaseOrders[purchaseSlot][i].user].purchasesRemaining == 0) {
+                        accounts[purchaseOrders[purchaseSlot][i].user].interval = 0;
+                    }
                 }
-                
+
                 // delete purchaseOrder post swap
-                delete purchaseOrders[_nextSlot];
-                emit PurchaseExecuted(_nextSlot, _targetPurchased);
+                delete purchaseOrders[purchaseSlot];
+                emit PerformUpkeepSucceeded(_now, purchaseSlot, _targetPurchased);
+                // increment only if purchase executed
+                purchaseSlot++;
             } else {
-                emit PerformUpkeepFailed(block.timestamp);
+                emit PerformUpkeepFailed(_now, purchaseSlot, _toPurchase);
             }
         }
     }
 
     // reconstruct accounts deployment schedule
     function reconstructSchedule(address _account) public view returns (uint256[] memory, uint256[] memory) {
-        // get account data
         uint _accountStart = accounts[_account].accountStart;
-        uint _scheduledBalance = accounts[_account].scheduledBalance;
         uint _interval = accounts[_account].interval;
         uint _purchasesRemaining = accounts[_account].purchasesRemaining;
-        uint _purchaseAmount = accounts[_account].purchaseAmount;
 
-        // create temporary arrays to be returned
-        uint[] memory timestamps = new uint[](_purchasesRemaining);
+        // temporary arrays to be returned
+        uint[] memory purchaseSlots = new uint[](_purchasesRemaining);
         uint[] memory purchaseAmounts = new uint[](_purchasesRemaining);
 
         // reconstruct strategy's deployment schedule
-        uint _unixInterval = _interval * upKeepInterval;
-        if(_purchasesRemaining == 1) {
-            timestamps[0] = _accountStart + _unixInterval;
-            for(uint i = 0; i < purchaseOrders[timestamps[0]].length; i++){
-                if(purchaseOrders[timestamps[0]][i].user == _account)
-                purchaseAmounts[0] = purchaseOrders[timestamps[0]][i].purchaseAmount;
-                i = purchaseOrders[timestamps[0]].length;
-            }
-            return(timestamps, purchaseAmounts);
-        }
-
-        for(uint i = 1; i <= _purchasesRemaining; i++) {
-            uint _nextUnixPurchaseDate = _accountStart + (_unixInterval * i);
-            timestamps[i-1] = _nextUnixPurchaseDate;
-            for(uint k = 0; k < purchaseOrders[timestamps[i-1]].length; k++){
-                if(purchaseOrders[timestamps[i-1]][k].user == _account){
-                    purchaseAmounts[i-1] = purchaseOrders[timestamps[i-1]][k].purchaseAmount;
-                    k = purchaseOrders[timestamps[i-1]].length;
+        for(uint i = 0; i < _purchasesRemaining; i++) {
+            uint _nextPurchaseSlot = _accountStart + (_interval * i);
+            purchaseSlots[i] = _nextPurchaseSlot;
+            for(uint k = 0; k < purchaseOrders[purchaseSlots[i]].length; k++){
+                if(purchaseOrders[purchaseSlots[i]][k].user == _account){
+                    purchaseAmounts[i] = purchaseOrders[purchaseSlots[i]][k].purchaseAmount;
+                    k = purchaseOrders[purchaseSlots[i]].length;
                 }
             }
         }
-        return(timestamps, purchaseAmounts);
+        return(purchaseSlots, purchaseAmounts);
     }
 
     // [initiateNewStrategy helper] does not handle depositing into existing strategies
@@ -284,46 +276,44 @@ contract Gravity is KeeperCompatibleInterface {
         require(_amount > 0, "Insufficient value");
         (bool success) = IERC20(_token).transferFrom(msg.sender, address(this), _amount);
         require(success, "Deposit unsuccessful");
-        emit Deposited(msg.sender, _amount);
+        emit Deposited(block.timestamp, msg.sender, _amount);
     }
 
     // [withdrawSource helper] constant time delete function 
-    function removePurchaseOrder(uint _timestamp, uint _purchaseOrderIndex) internal {
-        require(purchaseOrders[_timestamp].length > _purchaseOrderIndex, "Purchase order index out of range");
-        purchaseOrders[_timestamp][_purchaseOrderIndex] = purchaseOrders[_timestamp][purchaseOrders[_timestamp].length - 1];
-        purchaseOrders[_timestamp].pop(); // implicit delete
+    function removePurchaseOrder(uint _purchaseSlot, uint _purchaseOrderIndex) internal {
+        require(purchaseOrders[_purchaseSlot].length > _purchaseOrderIndex, "Purchase order index out of range");
+        purchaseOrders[_purchaseSlot][_purchaseOrderIndex] = purchaseOrders[_purchaseSlot][purchaseOrders[_purchaseSlot].length - 1];
+        purchaseOrders[_purchaseSlot].pop(); // implicit delete
     }
 
     // withdraw source token
     function withdrawSource(address _token, uint256 _amount) external {
         require(sourceTokens[_token] == true, "Unsupported asset type");
         require(accounts[msg.sender].scheduledBalance >= _amount, "Scheduled balance insufficient");
-        (uint[] memory timestamps, uint[] memory purchaseAmounts) = reconstructSchedule(msg.sender);
+        (uint[] memory purchaseSlots, uint[] memory purchaseAmounts) = reconstructSchedule(msg.sender);
         uint256 _accumulate;
-        uint256 i = timestamps.length - 1;
+        uint256 i = purchaseSlots.length - 1;
         // remove purchase orders in reverse order, comparing withdrawal amount with purchaseAmount
         while(_amount > _accumulate) {
-            for(uint k = 0; k < purchaseOrders[timestamps[i]].length; k++) {
-                if(purchaseOrders[timestamps[i]][k].user == msg.sender) {
+            for(uint k = 0; k < purchaseOrders[purchaseSlots[i]].length; k++) {
+                if(purchaseOrders[purchaseSlots[i]][k].user == msg.sender) {
                     // case 1: amount equals (purchase amount + accumulated balance), PO is removed
-                    if(purchaseOrders[timestamps[i]][k].purchaseAmount + _accumulate == _amount) {
+                    if(purchaseOrders[purchaseSlots[i]][k].purchaseAmount + _accumulate == _amount) {
                         _accumulate = _amount;
                         accounts[msg.sender].purchasesRemaining -= 1;
-                        // remove PO from array
-                        removePurchaseOrder(timestamps[i], k); 
+                        removePurchaseOrder(purchaseSlots[i], k); 
                     // case 2: amount less than (purchase amount + accumulated balance), PO is reduced
-                    } else if(purchaseOrders[timestamps[i]][k].purchaseAmount + _accumulate > _amount) {
+                    } else if(purchaseOrders[purchaseSlots[i]][k].purchaseAmount + _accumulate > _amount) {
                         // reduce purchase amount by difference
-                        purchaseOrders[timestamps[i]][k].purchaseAmount -= (_amount - _accumulate);
+                        purchaseOrders[purchaseSlots[i]][k].purchaseAmount -= (_amount - _accumulate);
                         _accumulate = _amount;
                     // case 3: amount exceeds (purchase amount + accumulated balance), PO is removed, continue accumulating
                     } else {
-                        _accumulate += purchaseOrders[timestamps[i]][k].purchaseAmount;
+                        _accumulate += purchaseOrders[purchaseSlots[i]][k].purchaseAmount;
                         accounts[msg.sender].purchasesRemaining -= 1;
-                        // remove PO from array
-                        removePurchaseOrder(timestamps[i], k);
+                        removePurchaseOrder(purchaseSlots[i], k);
                     }
-                    k = purchaseOrders[timestamps[i]].length;
+                    k = purchaseOrders[purchaseSlots[i]].length;
                 }
             }
             if(i > 0) {
@@ -332,13 +322,16 @@ contract Gravity is KeeperCompatibleInterface {
         }
 
         // if treasury cannot cover, redeem
+        // [LOCAL TESTING]
         if(_amount > IERC20(_token).balanceOf(address(this))){
-            redeemCompound(_amount - IERC20(_token).balanceOf(address(this)));
+           redeemCompound(_amount - IERC20(_token).balanceOf(address(this)));
         }
+        // [LOCAL TESTING]
+
         accounts[msg.sender].scheduledBalance -= _amount;
         (bool success) = IERC20(_token).transfer(msg.sender, _amount);
         require(success, "Withdrawal unsuccessful");
-        emit WithdrawnSource(msg.sender, _amount);
+        emit WithdrawnSource(block.timestamp, msg.sender, _amount);
     }
 
     // withdraw target token
@@ -348,7 +341,7 @@ contract Gravity is KeeperCompatibleInterface {
         accounts[msg.sender].targetBalance -= _amount;
         (bool success) = IERC20(_token).transfer(msg.sender, _amount);
         require(success, "Withdrawal unsuccessful");
-        emit WithdrawnTarget(msg.sender, _amount);
+        emit WithdrawnTarget(block.timestamp, msg.sender, _amount);
     }
     
     // temporary demo function to extract tokens
