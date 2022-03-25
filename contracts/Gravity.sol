@@ -233,12 +233,8 @@ contract Gravity is KeeperCompatibleInterface {
                 // delete purchaseOrder post swap
                 delete purchaseOrders[purchaseSlot];
                 emit PerformUpkeepSucceeded(_now, purchaseSlot, _targetPurchased);
-                purchaseSlot++;
-            } else if (_toPurchase == 0) {
-                purchaseSlot++;
-            } else {
-                emit PerformUpkeepFailed(_now, purchaseSlot, _toPurchase);
             }
+            purchaseSlot++;
         }
     }
 
