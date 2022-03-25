@@ -194,9 +194,6 @@ contract Gravity is KeeperCompatibleInterface {
     function checkUpkeep(bytes calldata /* checkData */) external view override returns (bool upkeepNeeded, bytes memory /* performData */) {
         uint _now = block.timestamp;
         if((_now - lastTimeStamp) > upKeepInterval) {
-            uint _toPurchase = accumulatePurchaseOrders(purchaseSlot);
-            
-            if(_toPurchase > 0) {
                 upkeepNeeded = true;
             }
         }
@@ -206,9 +203,9 @@ contract Gravity is KeeperCompatibleInterface {
     function performUpkeep(bytes calldata /* performData */) external override {
         uint _now = block.timestamp;
         // revalidate two conditions
-        if((_now - lastTimeStamp) > upKeepInterval) { 
-            uint _toPurchase = accumulatePurchaseOrders(purchaseSlot);
+        if((_now - lastTimeStamp) > upKeepInterval) {
             lastTimeStamp = _now;
+            uint _toPurchase = accumulatePurchaseOrders(purchaseSlot);
 
             if (_toPurchase > 0) {
                 // compound redeem
@@ -236,7 +233,8 @@ contract Gravity is KeeperCompatibleInterface {
                 // delete purchaseOrder post swap
                 delete purchaseOrders[purchaseSlot];
                 emit PerformUpkeepSucceeded(_now, purchaseSlot, _targetPurchased);
-                // increment only if purchase executed
+                purchaseSlot++;
+            } else if (_toPurchase == 0) {
                 purchaseSlot++;
             } else {
                 emit PerformUpkeepFailed(_now, purchaseSlot, _toPurchase);
