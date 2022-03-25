@@ -7,7 +7,6 @@ import "@chainlink/contracts/src/v0.8/KeeperCompatible.sol";
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 
-
 interface CErc20 {
     function mint(uint256) external returns (uint256);
     function exchangeRateCurrent() external returns (uint256);
@@ -34,8 +33,7 @@ contract Gravity is KeeperCompatibleInterface {
     mapping (address => bool) public targetTokens;              // mapping for supported tokens
 
     event NewStrategy(uint blockTimestamp, uint accountStart, address account);
-    event PerformUpkeepSucceeded(uint now, uint purchaseSlot, uint targetPurchased);
-    event PerformUpkeepFailed(uint now, uint purchaseSlot, uint toPurchase);
+    event PurchaseSucceeded(uint now, uint purchaseSlot, uint targetPurchased);
     event Deposited(uint timestamp, address from, uint256 sourceDeposited);
     event WithdrawnSource(uint timestamp, address to, uint256 sourceWithdrawn);
     event WithdrawnTarget(uint timestamp, address to, uint256 targetWithdrawn);
@@ -194,11 +192,7 @@ contract Gravity is KeeperCompatibleInterface {
     function checkUpkeep(bytes calldata /* checkData */) external view override returns (bool upkeepNeeded, bytes memory /* performData */) {
         uint _now = block.timestamp;
         if((_now - lastTimeStamp) > upKeepInterval) {
-            uint _toPurchase = accumulatePurchaseOrders(purchaseSlot);
-            
-            if(_toPurchase > 0) {
                 upkeepNeeded = true;
-            }
         }
     }
 
@@ -206,9 +200,9 @@ contract Gravity is KeeperCompatibleInterface {
     function performUpkeep(bytes calldata /* performData */) external override {
         uint _now = block.timestamp;
         // revalidate two conditions
-        if((_now - lastTimeStamp) > upKeepInterval) { 
-            uint _toPurchase = accumulatePurchaseOrders(purchaseSlot);
+        if((_now - lastTimeStamp) > upKeepInterval) {
             lastTimeStamp = _now;
+            uint _toPurchase = accumulatePurchaseOrders(purchaseSlot);
 
             if (_toPurchase > 0) {
                 // compound redeem
@@ -232,15 +226,11 @@ contract Gravity is KeeperCompatibleInterface {
                         accounts[purchaseOrders[purchaseSlot][i].user].interval = 0;
                     }
                 }
-
                 // delete purchaseOrder post swap
                 delete purchaseOrders[purchaseSlot];
-                emit PerformUpkeepSucceeded(_now, purchaseSlot, _targetPurchased);
-                // increment only if purchase executed
-                purchaseSlot++;
-            } else {
-                emit PerformUpkeepFailed(_now, purchaseSlot, _toPurchase);
+                emit PurchaseSucceeded(_now, purchaseSlot, _targetPurchased);
             }
+            purchaseSlot++;
         }
     }
 
