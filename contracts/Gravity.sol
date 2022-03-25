@@ -7,7 +7,6 @@ import "@chainlink/contracts/src/v0.8/KeeperCompatible.sol";
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 
-
 interface CErc20 {
     function mint(uint256) external returns (uint256);
     function exchangeRateCurrent() external returns (uint256);
@@ -34,8 +33,7 @@ contract Gravity is KeeperCompatibleInterface {
     mapping (address => bool) public targetTokens;              // mapping for supported tokens
 
     event NewStrategy(uint blockTimestamp, uint accountStart, address account);
-    event PerformUpkeepSucceeded(uint now, uint purchaseSlot, uint targetPurchased);
-    event PerformUpkeepFailed(uint now, uint purchaseSlot, uint toPurchase);
+    event PurchaseSucceeded(uint now, uint purchaseSlot, uint targetPurchased);
     event Deposited(uint timestamp, address from, uint256 sourceDeposited);
     event WithdrawnSource(uint timestamp, address to, uint256 sourceWithdrawn);
     event WithdrawnTarget(uint timestamp, address to, uint256 targetWithdrawn);
@@ -195,7 +193,6 @@ contract Gravity is KeeperCompatibleInterface {
         uint _now = block.timestamp;
         if((_now - lastTimeStamp) > upKeepInterval) {
                 upkeepNeeded = true;
-            }
         }
     }
 
@@ -229,10 +226,9 @@ contract Gravity is KeeperCompatibleInterface {
                         accounts[purchaseOrders[purchaseSlot][i].user].interval = 0;
                     }
                 }
-
                 // delete purchaseOrder post swap
                 delete purchaseOrders[purchaseSlot];
-                emit PerformUpkeepSucceeded(_now, purchaseSlot, _targetPurchased);
+                emit PurchaseSucceeded(_now, purchaseSlot, _targetPurchased);
             }
             purchaseSlot++;
         }
